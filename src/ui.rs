@@ -152,14 +152,21 @@ fn render_scripture(frame: &mut Frame, area: Rect, state: &AppState, colors: &Th
     ])
     .areas(inner);
 
-    let arabic = Paragraph::new(Line::styled(
-        ayah.arabic.as_str(),
-        Style::default()
-            .fg(colors.foreground)
-            .add_modifier(Modifier::BOLD),
-    ))
-    .alignment(Alignment::Right)
-    .wrap(Wrap { trim: false });
+    let arabic_lines: Vec<Line> =
+        crate::rtl::terminal_lines(&ayah.arabic, arabic_area.width.saturating_sub(1) as usize)
+            .into_iter()
+            .map(|line| {
+                Line::styled(
+                    line,
+                    Style::default()
+                        .fg(colors.foreground)
+                        .add_modifier(Modifier::BOLD),
+                )
+            })
+            .collect();
+    let arabic = Paragraph::new(arabic_lines)
+        .alignment(Alignment::Right)
+        .wrap(Wrap { trim: false });
     frame.render_widget(arabic, arabic_area);
 
     let translation = match state.language {
@@ -344,4 +351,96 @@ fn truncate(text: &str, max_chars: usize) -> String {
     let mut result: String = one_line.chars().take(max_chars.saturating_sub(1)).collect();
     result.push('…');
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::Language;
+    use crate::theme::Theme;
+    use ratatui::backend::TestBackend;
+    use ratatui::widgets::ListState;
+    use ratatui::Terminal;
+
+    #[test]
+    fn arabic_stays_inside_scripture_panel() {
+        let mut state = test_state();
+        let mut terminal = Terminal::new(TestBackend::new(120, 32)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut state)).unwrap();
+        let buffer = terminal.backend().buffer();
+
+        for y in 1..31 {
+            for x in 0..42 {
+                let symbol = buffer[(x, y)].symbol();
+                assert!(
+                    !symbol.chars().any(is_arabic_presentation_form),
+                    "Arabic escaped into cell ({x}, {y})"
+                );
+            }
+        }
+
+        assert_eq!(buffer[(23, 5)].symbol(), "│");
+        assert_eq!(buffer[(24, 5)].symbol(), "│");
+        assert_eq!(buffer[(41, 5)].symbol(), "│");
+        assert_eq!(buffer[(42, 5)].symbol(), "│");
+    }
+
+    #[test]
+    fn redraw_removes_previous_ayah_text() {
+        let mut state = test_state();
+        let mut terminal = Terminal::new(TestBackend::new(120, 32)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut state)).unwrap();
+
+        state.current_ayah = 1;
+        state.ayah_list.select(Some(1));
+        terminal.draw(|frame| draw(frame, &mut state)).unwrap();
+
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(!rendered.contains("In the name of Allah"));
+        assert_eq!(
+            rendered.matches("[All] praise is [due] to Allah").count(),
+            1
+        );
+        assert_eq!(rendered.matches("Surah: Al-Fatihah").count(), 1);
+        assert_eq!(rendered.matches("Page 1").count(), 1);
+    }
+
+    fn test_state() -> AppState {
+        let surahs = crate::data::load_fallback();
+        let mut surah_list = ListState::default();
+        surah_list.select(Some(0));
+        let mut ayah_list = ListState::default();
+        ayah_list.select(Some(0));
+
+        AppState {
+            surahs,
+            current_surah: 0,
+            current_ayah: 0,
+            active_panel: Panel::Surahs,
+            language: Language::English,
+            theme: Theme::Dark,
+            search_mode: false,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            show_help: false,
+            offline_mode: false,
+            status_msg: None,
+            quit_count: 0,
+            quit_started: None,
+            surah_list,
+            ayah_list,
+            search_list: ListState::default(),
+            bookmark_conn: None,
+        }
+    }
+
+    fn is_arabic_presentation_form(character: char) -> bool {
+        matches!(character as u32, 0xFB50..=0xFDFF | 0xFE70..=0xFEFF)
+    }
 }

@@ -6,6 +6,7 @@ mod data;
 mod input;
 mod prayer;
 mod quran;
+mod rtl;
 mod search;
 mod surah_meta;
 mod theme;

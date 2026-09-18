@@ -19,6 +19,7 @@ serde_json = "1"
 toml = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 fuzzy-matcher = "0.3"
+arabic_reshaper = "0.4.2"
 arboard = "3"
 rusqlite = { version = "0.31", features = ["bundled"] }
 chrono = "0.4"

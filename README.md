@@ -60,6 +60,8 @@ Subcommand output contains no ANSI escapes when piped.
 
 Unicode-capable terminals such as Windows Terminal, iTerm2, Kitty, Alacritty, and GNOME Terminal are supported. Arabic/Bengali glyph quality depends on installed fonts and terminal shaping support.
 
+The full-screen TUI shapes Arabic into terminal-safe visual order and omits combining recitation marks so terminal cursor positions remain stable. Plain CLI output and copied ayahs retain the original Uthmani text with all marks.
+
 Built with Rust, Ratatui, Crossterm, alquran.cloud, AlAdhan, and the fawazahmed0 hadith dataset.
 
 ## License

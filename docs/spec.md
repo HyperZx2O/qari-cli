@@ -87,6 +87,7 @@ Muslim developers who live in the terminal have no tool that matches the quality
 | Bookmarks DB | rusqlite | 0.31, bundled feature | SQLite; schema ported from Ayatika; `bundled` compiles SQLite in |
 | Fuzzy search | fuzzy-matcher | 0.3 | Rust port of `fts_fuzzy_match`; replaces Ayatika's C header |
 | Clipboard | arboard | 3.x | Cross-platform clipboard; mirrors christ-cli |
+| Arabic shaping | arabic_reshaper | 0.4.2 | Produces stable presentation-form cells for terminals without reliable RTL shaping |
 | Dev tooling | cargo, cargo-dist | latest | Build + cross-platform binary distribution |
 | Distribution | npm wrapper + install.sh | — | Mirrors christ-cli's install UX exactly |
 | Hosting | GitHub Releases (cargo-dist) | — | Free, standard for Rust CLIs |
@@ -138,7 +139,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 | Time budget | Personal project — no deadline | Build MVP first, nice-to-haves after |
 | Infra budget | $0 — GitHub Releases only | Binary distribution only; no server |
 | Binary size | Target ≤ 15MB (christ-cli is ~5MB) | Bundle only 3 editions offline; fetch others on demand |
-| Arabic rendering | Terminal must support Unicode; no font embedding | Works in Windows Terminal, iTerm2, Kitty, Alacritty. Warn if terminal reports no Unicode support |
+| Arabic rendering | Terminal must support Unicode; no font embedding | TUI uses visual-order presentation forms without combining marks; CLI and clipboard preserve full Uthmani text |
 | Bengali rendering | Same Unicode requirement | Same caveat; test with Windows Terminal + Bangla font |
 | Rust skill | Author has ML/backend experience, Rust is new | Use derive macros; keep modules small; refer to christ-cli source as implementation reference |
 | No `.cpp` files | N/A for Rust — not a constraint here | — |
@@ -175,7 +176,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Arabic Unicode not rendering in user's terminal | M | M | Print warning on launch if terminal reports limited Unicode; document supported terminals in README |
+| Arabic Unicode not rendering in user's terminal | M | M | Shape and reorder TUI text into stable terminal cells; retain full Uthmani text in CLI and clipboard output |
 | Bengali font missing on user system | M | L | Graceful fallback: show `[Bengali not available — install a Unicode font]` in scripture panel |
 | alquran.cloud API down on first run | L | H | Bundle Al-Fatiha + first 10 ayahs of Al-Baqarah as hardcoded fallback; show clear message to retry |
 | Rust learning curve slowing development | M | M | Reference christ-cli source directly for ratatui patterns; keep modules ≤ 200 lines each |
