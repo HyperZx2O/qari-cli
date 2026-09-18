@@ -1,0 +1,6 @@
+/target
+.env
+data/quran_*.json
+data/hadith*.json
+data/bookmarks.db
+data/config.ini
