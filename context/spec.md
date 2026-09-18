@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Project Name** | islam-cli |
+| **Project Name** | qari-cli |
 | **One-line Description** | A beautiful Quran TUI for Muslim developers — read, search, and reflect in your terminal. |
 | **Project Type** | `cli` |
 | **Hackathon / Context** | Personal project — spiritual counterpart to `christ-cli` (github.com/whoisyurii/christ-cli) |
@@ -21,7 +21,7 @@
 
 Every existing Quran CLI tool (`vanillaiice/quran-cli`, `codewithnuh/quran-cli`, `omeiirr/quran-cli`) is a minimal lookup utility — a flag-based command that prints text and exits. None offer a full-screen interactive TUI comparable to what `christ-cli` gives Bible readers: a browsable 3-panel interface, themes, live search, session persistence, and a polished experience that makes spending time in the terminal feel intentional.
 
-Muslim developers who live in the terminal have no tool that matches the quality of `christ-cli`. `islam-cli` fills that gap with the same TUI depth, adding Islamic-specific features (Juz navigation, transliteration, offline prayer times, Bengali translation) drawn from `Ayatika` — a prior C/RayLib Quran desktop app by the same author.
+Muslim developers who live in the terminal have no tool that matches the quality of `christ-cli`. `qari-cli` fills that gap with the same TUI depth, adding Islamic-specific features (Juz navigation, transliteration, offline prayer times, Bengali translation) drawn from `Ayatika` — a prior C/RayLib Quran desktop app by the same author.
 
 ---
 
@@ -31,8 +31,8 @@ Muslim developers who live in the terminal have no tool that matches the quality
 |-----------|------|-----------------|----------------|
 | Muslim developer | Read Quran during work breaks without leaving the terminal | Full-screen TUI + subcommands | Navigates surahs/ayahs, reads Arabic + translation side by side |
 | Bangladeshi developer | Read in Bengali translation | TUI language toggle | Bengali text renders correctly in the scripture panel |
-| Any user (quick lookup) | Fetch a specific ayah fast | CLI subcommand (`islam read 2:255`) | Correct ayah printed to stdout and exits |
-| Any user (prayer times) | Check today's prayer times without opening a browser | CLI subcommand (`islam pray`) | All 5 prayer times printed for configured location |
+| Any user (quick lookup) | Fetch a specific ayah fast | CLI subcommand (`qari read 2:255`) | Correct ayah printed to stdout and exits |
+| Any user (prayer times) | Check today's prayer times without opening a browser | CLI subcommand (`qari pray`) | All 5 prayer times printed for configured location |
 
 ---
 
@@ -43,23 +43,23 @@ Muslim developers who live in the terminal have no tool that matches the quality
 - [ ] **Full-screen 3-panel TUI** — Surahs panel | Ayahs panel | Scripture panel (Arabic + translation), navigable with arrow keys and Vim keys (j/k/h/l), matching christ-cli's panel layout.
 - [ ] **Offline Quran data** — Arabic (Uthmani), English (Sahih International), and Bengali (Muhiuddin Khan) bundled in the binary; no internet required after install.
 - [ ] **114 Surah metadata** — Name (Arabic + transliterated), meaning, Makki/Madani label, revelation order, ayah count — ported from `Ayatika`'s `surah_meta.c`; embedded as a Rust const array, never fetched.
-- [ ] **`islam read <surah>:<ayah>`** — Read a specific ayah by reference (e.g., `islam read 2:255`, `islam read Al-Baqarah 2:255`). Prints to stdout (pipe-friendly plain text when piped, rich TUI when interactive).
-- [ ] **`islam search <query>`** — Fuzzy full-text search over English translation + surah name (surah name gets +500 score boost), top 15 results. Algorithm ported from `Ayatika`'s `search.c` (`fts_fuzzy_match` logic). Minimum 2 characters.
-- [ ] **`islam random`** — Print a random ayah (Arabic + translation).
-- [ ] **`islam today`** — Ayah of the day, seeded by `day_of_year % 6236` (same formula as Ayatika).
-- [ ] **Session persistence** — Remembers last surah/ayah position, selected language, and theme across sessions. Stored in `~/.config/islam-cli/config.toml`.
+- [ ] **`qari read <surah>:<ayah>`** — Read a specific ayah by reference (e.g., `qari read 2:255`, `qari read Al-Baqarah 2:255`). Prints to stdout (pipe-friendly plain text when piped, rich TUI when interactive).
+- [ ] **`qari search <query>`** — Fuzzy full-text search over English translation + surah name (surah name gets +500 score boost), top 15 results. Algorithm ported from `Ayatika`'s `search.c` (`fts_fuzzy_match` logic). Minimum 2 characters.
+- [ ] **`qari random`** — Print a random ayah (Arabic + translation).
+- [ ] **`qari today`** — Ayah of the day, seeded by `day_of_year % 6236` (same formula as Ayatika).
+- [ ] **Session persistence** — Remembers last surah/ayah position, selected language, and theme across sessions. Stored in `~/.config/qari-cli/config.toml`.
 - [ ] **Themes** — At least 3 themes: Dark (default), Light, Sepia. Toggled in TUI with `t`.
 
 ### Nice-to-Have (only if MVP is done and time remains)
 
-- [ ] **`islam pray`** — Today's 5 prayer times (Fajr, Dhuhr, Asr, Maghrib, Isha) computed offline using PrayTime algorithm (Karachi method, Hanafi Asr factor 2), from configured lat/lng. Ported from `Ayatika`'s `prayer.c`.
-- [ ] **`islam hadith`** — Hadith of the day, seeded by `day_of_year % totalHadiths`, fetched from `fawazahmed0/hadith-api` jsDelivr CDN and cached to `~/.local/share/islam-cli/hadith.json`.
-- [ ] **Bookmarks** — Save/delete ayah bookmarks with optional tag and note, persisted to SQLite (`~/.local/share/islam-cli/bookmarks.db`). Schema ported directly from `Ayatika`'s `db.c`. Toggle with `b` in TUI.
+- [ ] **`qari pray`** — Today's 5 prayer times (Fajr, Dhuhr, Asr, Maghrib, Isha) computed offline using PrayTime algorithm (Karachi method, Hanafi Asr factor 2), from configured lat/lng. Ported from `Ayatika`'s `prayer.c`.
+- [ ] **`qari hadith`** — Hadith of the day, seeded by `day_of_year % totalHadiths`, fetched from `fawazahmed0/hadith-api` jsDelivr CDN and cached to `~/.local/share/qari-cli/hadith.json`.
+- [ ] **Bookmarks** — Save/delete ayah bookmarks with optional tag and note, persisted to SQLite (`~/.local/share/qari-cli/bookmarks.db`). Schema ported directly from `Ayatika`'s `db.c`. Toggle with `b` in TUI.
 - [ ] **Juz navigation** — Browse by Juz (1–30) in addition to Surah. `J` key in TUI switches to Juz mode.
 - [ ] **Transliteration toggle** — Show/hide romanized Arabic transliteration below each ayah. `i` key in TUI.
 - [ ] **Online translation fallback** — If internet available, fetch any of 440+ editions from `alquran.cloud` REST API (unauthenticated). `v` key opens edition picker in TUI.
-- [ ] **`islam pray --city <name>`** — Override location for prayer times using AlAdhan API (`api.aladhan.com/v1/timingsByCity`).
-- [ ] **npm distribution** — Wrap binary in an npm package for `npm install -g islam-cli`, mirroring christ-cli's distribution.
+- [ ] **`qari pray --city <name>`** — Override location for prayer times using AlAdhan API (`api.aladhan.com/v1/timingsByCity`).
+- [ ] **npm distribution** — Wrap binary in an npm package for `npm install -g qari-cli`, mirroring christ-cli's distribution.
 
 ### Explicitly Out of Scope
 
@@ -96,7 +96,7 @@ Muslim developers who live in the terminal have no tool that matches the quality
 ## 6. Architecture & Data Flow
 
 ### First Run
-User runs `islam` → binary checks `~/.local/share/islam-cli/quran_ar.json`. If missing → fetches `quran-uthmani`, `en.sahih`, `bn.bengali` editions from `api.alquran.cloud/v1/quran/{edition}` → writes 3 JSON files to `~/.local/share/islam-cli/`. If fetch fails → falls back to minimal bundled dataset (Al-Fatiha + Ayat al-Kursi) with status message `"Offline mode — connect to fetch full data"`.
+User runs `qari` → binary checks `~/.local/share/qari-cli/quran_ar.json`. If missing → fetches `quran-uthmani`, `en.sahih`, `bn.bengali` editions from `api.alquran.cloud/v1/quran/{edition}` → writes 3 JSON files to `~/.local/share/qari-cli/`. If fetch fails → falls back to minimal bundled dataset (Al-Fatiha + Ayat al-Kursi) with status message `"Offline mode — connect to fetch full data"`.
 
 ### Subsequent Runs
 Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launches TUI (or executes subcommand and exits).
@@ -105,7 +105,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 `App` struct holds state: `selected_surah`, `selected_ayah`, `active_panel`, `language`, `theme`, `search_query`. `crossterm` event loop reads key events → `handle_input()` mutates state → `ratatui::Terminal::draw()` renders three `Block` widgets per frame. On quit (`qq`) → `save_config()` writes `lastSurah`, `lastAyah`, `language`, `theme` to config.
 
 ### Subcommand Flow
-`islam read 2:255` → clap parses → load data from cache (or fetch) → find ayah → print to stdout (plain text if piped, styled if TTY) → exit 0.
+`qari read 2:255` → clap parses → load data from cache (or fetch) → find ayah → print to stdout (plain text if piped, styled if TTY) → exit 0.
 
 ### Key Entities / Data Structures
 
@@ -124,7 +124,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 |---------|----------|
 | **What this system does NOT do** | No audio, no tafsir, no user accounts, no web UI, no push notifications |
 | **External dependencies** | `api.alquran.cloud` (Quran data, first run only) — fallback: bundled minimal dataset. `fawazahmed0/hadith-api` jsDelivr CDN (hadith, nice-to-have) — fallback: skip feature with message. `api.aladhan.com` (city prayer times, nice-to-have) — fallback: offline PrayTime calculation |
-| **Data stored** | `~/.local/share/islam-cli/quran_ar.json`, `quran_en.json`, `quran_bn.json`, `hadith.json`, `bookmarks.db`. `~/.config/islam-cli/config.toml` |
+| **Data stored** | `~/.local/share/qari-cli/quran_ar.json`, `quran_en.json`, `quran_bn.json`, `hadith.json`, `bookmarks.db`. `~/.config/qari-cli/config.toml` |
 | **Data never stored** | No PII, no API keys, no secrets. All data is public Islamic scripture |
 | **Authentication** | None — all APIs used are fully unauthenticated and free |
 | **Rate limits / quotas** | alquran.cloud: no stated rate limit; data fetched once and cached. jsDelivr CDN: no rate limit |
@@ -149,14 +149,14 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 
 | Feature | Passing Condition (EARS) |
 |---------|--------------------------|
-| 3-panel TUI | WHEN user runs `islam` with no args THE system SHALL open a full-screen TUI with Surahs, Ayahs, and Scripture panels visible and navigable within 1 second |
+| 3-panel TUI | WHEN user runs `qari` with no args THE system SHALL open a full-screen TUI with Surahs, Ayahs, and Scripture panels visible and navigable within 1 second |
 | Offline Quran data | WHEN user runs any command with no internet connection THE system SHALL still display Arabic + English ayahs from cached or bundled data |
 | 114 Surah metadata | WHEN user browses the Surahs panel THE system SHALL display all 114 surahs with name, transliteration, and Makki/Madani badge |
-| `islam read` | WHEN user runs `islam read 2:255` THE system SHALL print Ayat al-Kursi in Arabic and English to stdout and exit 0 |
-| `islam read` pipe-friendly | WHEN user runs `islam read 2:255 \| wc -l` THE system SHALL output plain text with no ANSI escape codes |
-| `islam search` | WHEN user runs `islam search "mercy"` THE system SHALL return up to 15 ayah results ranked by fuzzy score, with surah name results boosted |
-| `islam random` | WHEN user runs `islam random` THE system SHALL print a random ayah (Arabic + English) that is different from the previous call with high probability |
-| `islam today` | WHEN user runs `islam today` on the same calendar day twice THE system SHALL return the same ayah both times |
+| `qari read` | WHEN user runs `qari read 2:255` THE system SHALL print Ayat al-Kursi in Arabic and English to stdout and exit 0 |
+| `qari read` pipe-friendly | WHEN user runs `qari read 2:255 \| wc -l` THE system SHALL output plain text with no ANSI escape codes |
+| `qari search` | WHEN user runs `qari search "mercy"` THE system SHALL return up to 15 ayah results ranked by fuzzy score, with surah name results boosted |
+| `qari random` | WHEN user runs `qari random` THE system SHALL print a random ayah (Arabic + English) that is different from the previous call with high probability |
+| `qari today` | WHEN user runs `qari today` on the same calendar day twice THE system SHALL return the same ayah both times |
 | Session persistence | WHEN user closes TUI and reopens it THE system SHALL restore the last surah/ayah position, language, and theme |
 | Themes | WHEN user presses `t` in TUI THE system SHALL cycle to the next theme and re-render immediately |
 | Bengali translation | WHEN user selects Bengali (`bn`) language THE system SHALL display Bengali translation text in the Scripture panel for every ayah |
@@ -166,7 +166,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 - [ ] No panic on happy path with realistic input (all 114 surahs, 6236 ayahs)
 - [ ] Binary runs on macOS, Linux, and Windows without extra dependencies
 - [ ] README covers install + first run in ≤ 5 steps
-- [ ] `islam read 2:255` works fully offline after first data fetch
+- [ ] `qari read 2:255` works fully offline after first data fetch
 - [ ] TUI exits cleanly on `qq` and `Ctrl+C` with terminal restored
 
 ---
@@ -188,7 +188,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 ## 11. File & Folder Structure
 
 ```
-islam-cli/
+qari-cli/
 ├── src/
 │   ├── main.rs              # Entry point: clap dispatch → subcommand or TUI
 │   ├── app.rs               # AppState struct + event loop
@@ -199,16 +199,16 @@ islam-cli/
 │   ├── search.rs            # Fuzzy search over ayahs (fts_fuzzy_match logic, surah name boost)
 │   ├── prayer.rs            # Offline PrayTime calculation (ported from prayer.c)
 │   ├── bookmarks.rs         # SQLite CRUD via rusqlite (schema from Ayatika db.c)
-│   ├── config.rs            # Load/save ~/.config/islam-cli/config.toml
+│   ├── config.rs            # Load/save ~/.config/qari-cli/config.toml
 │   ├── theme.rs             # Theme enum + color tokens (Dark, Light, Sepia)
 │   ├── input.rs             # Key event → AppAction mapping (Vim + arrow modes)
 │   └── commands/
-│       ├── read.rs          # `islam read <ref>` — parse ref, print ayah
-│       ├── search.rs        # `islam search <query>` — CLI search output
-│       ├── random.rs        # `islam random`
-│       ├── today.rs         # `islam today` (day_of_year % 6236)
-│       ├── pray.rs          # `islam pray` (offline) + `--city` (AlAdhan API)
-│       └── hadith.rs        # `islam hadith` (fawazahmed0 CDN, day-seeded)
+│       ├── read.rs          # `qari read <ref>` — parse ref, print ayah
+│       ├── search.rs        # `qari search <query>` — CLI search output
+│       ├── random.rs        # `qari random`
+│       ├── today.rs         # `qari today` (day_of_year % 6236)
+│       ├── pray.rs          # `qari pray` (offline) + `--city` (AlAdhan API)
+│       └── hadith.rs        # `qari hadith` (fawazahmed0 CDN, day-seeded)
 ├── data/
 │   └── fallback.json        # Bundled minimal dataset (Al-Fatiha + Ayat al-Kursi)
 ├── assets/
@@ -220,7 +220,7 @@ islam-cli/
 │   └── workflows/
 │       └── release.yml      # cargo-dist: build + publish binaries on tag push
 ├── tests/
-│   ├── test_read.rs         # `islam read 2:255` output test
+│   ├── test_read.rs         # `qari read 2:255` output test
 │   ├── test_search.rs       # fuzzy search scoring + surah boost
 │   ├── test_today.rs        # day-seeded ayah determinism
 │   ├── test_surah_meta.rs   # all 114 entries present and valid

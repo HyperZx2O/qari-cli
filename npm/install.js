@@ -20,11 +20,11 @@ const entry = platforms[`${os.platform()}-${os.arch()}`];
 if (!entry) throw new Error(`Unsupported platform: ${os.platform()}-${os.arch()}`);
 const [target, extension] = entry;
 const binDir = path.join(__dirname, "bin");
-const binary = path.join(binDir, os.platform() === "win32" ? "islam.exe" : "islam");
+const binary = path.join(binDir, os.platform() === "win32" ? "qari.exe" : "qari");
 
 function download(url, destination) {
   return new Promise((resolve, reject) => {
-    const request = current => https.get(current, { headers: { "User-Agent": "islam-cli-npm" } }, response => {
+    const request = current => https.get(current, { headers: { "User-Agent": "qari-cli-npm" } }, response => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) return request(response.headers.location);
       if (response.statusCode !== 200) return reject(new Error(`Download failed: HTTP ${response.statusCode}`));
       const file = fs.createWriteStream(destination);
@@ -38,9 +38,9 @@ function download(url, destination) {
 
 async function install() {
   fs.mkdirSync(binDir, { recursive: true });
-  const archive = path.join(binDir, `islam.${extension}`);
-  const url = `https://github.com/${REPO}/releases/download/v${version}/islam-${target}.${extension}`;
-  console.log(`Installing islam-cli v${version} for ${target}...`);
+  const archive = path.join(binDir, `qari.${extension}`);
+  const url = `https://github.com/${REPO}/releases/download/v${version}/qari-${target}.${extension}`;
+  console.log(`Installing qari-cli v${version} for ${target}...`);
   await download(url, archive);
   execFileSync("tar", [extension === "zip" ? "-xf" : "-xzf", archive, "-C", binDir]);
   fs.unlinkSync(archive);
@@ -56,6 +56,6 @@ async function install() {
   const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
   process.exit(result.status ?? 1);
 })().catch(error => {
-  console.error(`islam-cli: ${error.message}`);
+  console.error(`qari-cli: ${error.message}`);
   process.exit(1);
 });

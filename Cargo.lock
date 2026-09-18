@@ -939,24 +939,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
-name = "islam-cli"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "chrono",
- "clap",
- "crossterm",
- "dirs",
- "fuzzy-matcher",
- "ratatui",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
 name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1287,6 +1269,24 @@ name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
+
+[[package]]
+name = "qari-cli"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "chrono",
+ "clap",
+ "crossterm",
+ "dirs",
+ "fuzzy-matcher",
+ "ratatui",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml",
+]
 
 [[package]]
 name = "quick-error"

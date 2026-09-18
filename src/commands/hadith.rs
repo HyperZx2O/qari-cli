@@ -69,7 +69,7 @@ fn fetch_hadith(ordinal: usize) -> Result<Hadith, String> {
     );
     let response: HadithResponse = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
-        .user_agent("islam-cli/0.1.0")
+        .user_agent("qari-cli/0.1.0")
         .build()
         .map_err(|error| error.to_string())?
         .get(url)

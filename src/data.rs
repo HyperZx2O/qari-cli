@@ -42,14 +42,14 @@ pub fn get_data_dir() -> PathBuf {
     dirs::data_local_dir()
         .or_else(|| dirs::home_dir().map(|home| home.join(".local").join("share")))
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("islam-cli")
+        .join("qari-cli")
 }
 
 pub fn get_config_dir() -> PathBuf {
     dirs::config_dir()
         .or_else(|| dirs::home_dir().map(|home| home.join(".config")))
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("islam-cli")
+        .join("qari-cli")
 }
 
 pub fn ensure_data_dir() -> std::io::Result<()> {
@@ -95,7 +95,7 @@ fn fetch_and_cache(show_progress: bool) -> Result<Vec<Surah>, Box<dyn Error>> {
 
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(90))
-        .user_agent("islam-cli/0.1.0")
+        .user_agent("qari-cli/0.1.0")
         .build()?;
 
     let mut raw_editions = Vec::with_capacity(EDITIONS.len());

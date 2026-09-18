@@ -50,7 +50,7 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, colors: &Theme
     };
     let mut spans = vec![
         Span::styled(
-            " islam-cli ",
+            " qari-cli ",
             Style::default()
                 .fg(colors.accent)
                 .add_modifier(Modifier::BOLD),

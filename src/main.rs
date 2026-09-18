@@ -14,7 +14,7 @@ mod ui;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "islam", version, about = "Read the Quran in your terminal")]
+#[command(name = "qari", version, about = "Read the Quran in your terminal")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -51,7 +51,7 @@ fn main() {
     let cli = Cli::parse();
 
     if let Err(error) = data::ensure_data_dir() {
-        eprintln!("Cannot create islam-cli data directories: {error}");
+        eprintln!("Cannot create qari-cli data directories: {error}");
         std::process::exit(1);
     }
 

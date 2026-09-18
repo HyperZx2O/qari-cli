@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="HyperZx2O/qari-cli"
-BINARY="islam"
+BINARY="qari"
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 
@@ -19,12 +19,12 @@ case "$OS" in
 esac
 
 LATEST=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -1)
-URL="https://github.com/${REPO}/releases/download/${LATEST}/islam-${TARGET}.tar.gz"
+URL="https://github.com/${REPO}/releases/download/${LATEST}/qari-${TARGET}.tar.gz"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
-echo "Downloading islam-cli ${LATEST} for ${TARGET}..."
+echo "Downloading qari-cli ${LATEST} for ${TARGET}..."
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 curl -fsSL "$URL" | tar -xz -C "$TMP_DIR"
 install -m 755 "$TMP_DIR/$BINARY" "$INSTALL_DIR/$BINARY"
-echo "Done. Run: islam"
+echo "Done. Run: qari"

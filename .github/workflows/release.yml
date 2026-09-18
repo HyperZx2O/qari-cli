@@ -45,15 +45,15 @@ jobs:
         run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Archive Unix binary
         if: runner.os != 'Windows'
-        run: tar -C target/${{ matrix.target }}/release -czf islam-${{ matrix.target }}.tar.gz islam
+        run: tar -C target/${{ matrix.target }}/release -czf qari-${{ matrix.target }}.tar.gz qari
       - name: Archive Windows binary
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive target/${{ matrix.target }}/release/islam.exe islam-${{ matrix.target }}.zip
+        run: Compress-Archive target/${{ matrix.target }}/release/qari.exe qari-${{ matrix.target }}.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: islam-${{ matrix.target }}
-          path: islam-${{ matrix.target }}.*
+          name: qari-${{ matrix.target }}
+          path: qari-${{ matrix.target }}.*
 
   release:
     needs: build
@@ -64,13 +64,13 @@ jobs:
           path: artifacts
           merge-multiple: true
       - name: Generate checksums
-        run: cd artifacts && sha256sum islam-* > SHA256SUMS.txt
+        run: cd artifacts && sha256sum qari-* > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            artifacts/islam-*.tar.gz
-            artifacts/islam-*.zip
+            artifacts/qari-*.tar.gz
+            artifacts/qari-*.zip
             artifacts/SHA256SUMS.txt
 
   publish-npm:

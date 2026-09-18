@@ -1,4 +1,4 @@
-# islam-cli
+# qari-cli
 
 A full-screen Quran reader for the terminal, with Arabic, Sahih International English, and Muhiuddin Khan Bengali text.
 
@@ -7,7 +7,7 @@ A full-screen Quran reader for the terminal, with Arabic, Sahih International En
 ## Install
 
 ```sh
-npm install -g islam-cli
+npm install -g qari-cli
 ```
 
 Or on Linux/macOS:
@@ -21,15 +21,15 @@ On first use, the application downloads and caches all three Quran editions. A s
 ## Usage
 
 ```sh
-islam                         # interactive TUI
-islam read 2:255              # specific ayah
-islam read "Al-Baqarah"       # full surah
-islam search mercy            # top fuzzy matches
-islam random                  # random ayah
-islam today                   # deterministic ayah of the day
-islam pray                    # configured coordinates
-islam pray --city Dhaka --country BD
-islam hadith                  # Sahih al-Bukhari hadith of the day
+qari                         # interactive TUI
+qari read 2:255              # specific ayah
+qari read "Al-Baqarah"       # full surah
+qari search mercy            # top fuzzy matches
+qari random                  # random ayah
+qari today                   # deterministic ayah of the day
+qari pray                    # configured coordinates
+qari pray --city Dhaka --country BD
+qari hadith                  # Sahih al-Bukhari hadith of the day
 ```
 
 Subcommand output contains no ANSI escapes when piped.
