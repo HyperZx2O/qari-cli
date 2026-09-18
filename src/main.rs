@@ -1,9 +1,14 @@
+mod app;
+mod bookmarks;
 mod commands;
 mod config;
 mod data;
+mod input;
 mod quran;
 mod search;
 mod surah_meta;
+mod theme;
+mod ui;
 
 use clap::{Parser, Subcommand};
 
@@ -61,8 +66,18 @@ fn main() {
             }
         }
         None => {
-            eprintln!("Open the interactive reader in the next feature commit.");
-            eprintln!("For now, try: islam read 2:255");
+            let (surahs, offline_mode) = match data::load_quran(true) {
+                Ok(surahs) => (surahs, false),
+                Err(error) => {
+                    eprintln!("Could not load the complete Quran: {error}");
+                    eprintln!("Using the bundled offline selection.");
+                    (data::load_fallback(), true)
+                }
+            };
+            if let Err(error) = app::run(surahs, config, offline_mode) {
+                eprintln!("TUI error: {error}");
+                std::process::exit(1);
+            }
         }
     }
 }
