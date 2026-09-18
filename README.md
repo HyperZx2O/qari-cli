@@ -22,6 +22,9 @@ On first use, the application downloads and caches all three Quran editions. A s
 
 ```sh
 qari                         # interactive TUI
+qari intro                   # replay the startup animation
+qari --intro                 # force the animation before reading
+qari --no-intro              # skip the animation
 qari read 2:255              # specific ayah
 qari read "Al-Baqarah"       # full surah
 qari search mercy            # top fuzzy matches
@@ -53,6 +56,7 @@ Subcommand output contains no ANSI escapes when piped.
 ## Features
 
 - Three-panel Surah, Ayah, and Scripture browser
+- Animated first-launch intro while Quran data loads
 - Arabic, English, and Bengali text cached for offline use
 - Live fuzzy search, three themes, bookmarks, and session persistence
 - Prayer times with Karachi/Hanafi defaults and optional city lookup

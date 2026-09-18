@@ -49,6 +49,7 @@ Muslim developers who live in the terminal have no tool that matches the quality
 - [ ] **`qari today`** — Ayah of the day, seeded by `day_of_year % 6236` (same formula as Ayatika).
 - [ ] **Session persistence** — Remembers last surah/ayah position, selected language, and theme across sessions. Stored in `~/.config/qari-cli/config.toml`.
 - [ ] **Themes** — At least 3 themes: Dark (default), Light, Sepia. Toggled in TUI with `t`.
+- [ ] **Startup intro** — Show a skippable Qari animation on first launch while Quran data loads, with `qari intro`, `--intro`, and `--no-intro` controls.
 
 ### Nice-to-Have (only if MVP is done and time remains)
 
@@ -115,7 +116,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 - `SurahMeta` — const array of 114 entries embedded at compile time (ported from `surah_meta.c`); fields: number, name, meaning, is_meccan, revelation_order, ayah_count
 - `AppState` — `current_surah: usize`, `current_ayah: usize`, `active_panel: Panel`, `language: Language`, `theme: Theme`, `search_mode: bool`, `search_query: String`, `bookmarks: Vec<Bookmark>`
 - `Bookmark` — `surah_id: u8`, `ayah_id: u16`, `tag: String`, `note: String`, `timestamp: i64` (SQLite schema from Ayatika)
-- `Config` — `last_surah: u8`, `last_ayah: u16`, `language: String`, `theme: String`, `latitude: f64`, `longitude: f64`, `calc_method: u8`
+- `Config` — `last_surah: u8`, `last_ayah: u16`, `language: String`, `theme: String`, `latitude: f64`, `longitude: f64`, `calc_method: u8`, `intro_shown: bool`
 
 ---
 
@@ -160,6 +161,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 | `qari today` | WHEN user runs `qari today` on the same calendar day twice THE system SHALL return the same ayah both times |
 | Session persistence | WHEN user closes TUI and reopens it THE system SHALL restore the last surah/ayah position, language, and theme |
 | Themes | WHEN user presses `t` in TUI THE system SHALL cycle to the next theme and re-render immediately |
+| Startup intro | WHEN a user launches `qari` for the first time THE system SHALL immediately show a skippable animation while Quran data loads |
 | Bengali translation | WHEN user selects Bengali (`bn`) language THE system SHALL display Bengali translation text in the Scripture panel for every ayah |
 
 **Definition of Done (whole project):**
@@ -203,6 +205,7 @@ qari-cli/
 │   ├── config.rs            # Load/save ~/.config/qari-cli/config.toml
 │   ├── theme.rs             # Theme enum + color tokens (Dark, Light, Sepia)
 │   ├── input.rs             # Key event → AppAction mapping (Vim + arrow modes)
+│   ├── intro.rs             # First-launch animation and loading state
 │   └── commands/
 │       ├── read.rs          # `qari read <ref>` — parse ref, print ayah
 │       ├── search.rs        # `qari search <query>` — CLI search output

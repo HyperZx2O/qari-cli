@@ -11,6 +11,7 @@ pub struct Config {
     pub latitude: f64,
     pub longitude: f64,
     pub calc_method: u8,
+    pub intro_shown: bool,
 }
 
 impl Default for Config {
@@ -23,6 +24,7 @@ impl Default for Config {
             latitude: 23.8103,
             longitude: 90.4125,
             calc_method: 0,
+            intro_shown: false,
         }
     }
 }
@@ -42,5 +44,28 @@ pub fn save_config(config: &Config) {
     }
     if let Ok(content) = toml::to_string_pretty(config) {
         let _ = std::fs::write(dir.join("config.toml"), content);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_config_defaults_intro_to_not_shown() {
+        let config: Config = toml::from_str(
+            r#"
+last_surah = 2
+last_ayah = 255
+language = "en"
+theme = "dark"
+latitude = 23.8103
+longitude = 90.4125
+calc_method = 0
+"#,
+        )
+        .unwrap();
+        assert!(!config.intro_shown);
+        assert_eq!(config.last_surah, 2);
     }
 }

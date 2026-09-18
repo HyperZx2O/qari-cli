@@ -4,6 +4,7 @@ mod commands;
 mod config;
 mod data;
 mod input;
+mod intro;
 mod prayer;
 mod quran;
 mod rtl;
@@ -19,6 +20,14 @@ use clap::{Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    /// Skip the startup animation
+    #[arg(long, global = true)]
+    no_intro: bool,
+
+    /// Play the startup animation even if it has already been shown
+    #[arg(long, global = true, conflicts_with = "no_intro")]
+    intro: bool,
 }
 
 #[derive(Subcommand)]
@@ -46,6 +55,8 @@ enum Commands {
     },
     /// Print the hadith of the day
     Hadith,
+    /// Replay the startup animation
+    Intro,
 }
 
 fn main() {
@@ -57,6 +68,7 @@ fn main() {
     }
 
     let config = config::load_config();
+    let show_intro = cli.intro || (!cli.no_intro && !config.intro_shown);
 
     match cli.command {
         Some(Commands::Pray { city, country }) => {
@@ -71,6 +83,7 @@ fn main() {
                 std::process::exit(2);
             }
         }
+        Some(Commands::Intro) => run_tui(config, true),
         Some(command) => {
             let surahs = data::load_quran(false).unwrap_or_else(|error| {
                 eprintln!("Could not load the complete Quran: {error}");
@@ -82,26 +95,36 @@ fn main() {
                 Commands::Search { query } => commands::search::run(&query, &surahs),
                 Commands::Random => commands::random::run(&surahs, &config),
                 Commands::Today => commands::today::run(&surahs, &config),
-                Commands::Pray { .. } | Commands::Hadith => unreachable!(),
+                Commands::Pray { .. } | Commands::Hadith | Commands::Intro => unreachable!(),
             };
             if let Err(error) = result {
                 eprintln!("{error}");
                 std::process::exit(2);
             }
         }
-        None => {
-            let (surahs, offline_mode) = match data::load_quran(true) {
-                Ok(surahs) => (surahs, false),
-                Err(error) => {
-                    eprintln!("Could not load the complete Quran: {error}");
-                    eprintln!("Using the bundled offline selection.");
-                    (data::load_fallback(), true)
-                }
-            };
-            if let Err(error) = app::run(surahs, config, offline_mode) {
-                eprintln!("TUI error: {error}");
-                std::process::exit(1);
-            }
-        }
+        None => run_tui(config, show_intro),
+    }
+}
+
+fn run_tui(config: config::Config, show_intro: bool) {
+    if let Err(error) = app::run(config, show_intro) {
+        eprintln!("TUI error: {error}");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intro_flags_conflict() {
+        assert!(Cli::try_parse_from(["qari", "--intro", "--no-intro"]).is_err());
+    }
+
+    #[test]
+    fn intro_subcommand_parses() {
+        let cli = Cli::try_parse_from(["qari", "intro"]).unwrap();
+        assert!(matches!(cli.command, Some(Commands::Intro)));
     }
 }

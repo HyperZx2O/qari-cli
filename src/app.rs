@@ -1,13 +1,17 @@
 use crate::config::{self, Config};
+use crate::data;
 use crate::input::{self, AppAction};
+use crate::intro::{self, IntroState};
 use crate::quran::Surah;
 use crate::search::{search_quran, SearchResult};
 use crate::theme::Theme;
 use crate::ui;
-use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::widgets::ListState;
 use ratatui::DefaultTerminal;
 use std::error::Error;
+use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::thread;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -371,21 +375,105 @@ impl AppState {
     }
 }
 
-pub fn run(surahs: Vec<Surah>, config: Config, offline_mode: bool) -> Result<(), Box<dyn Error>> {
+pub fn run(config: Config, show_intro: bool) -> Result<(), Box<dyn Error>> {
+    let mut terminal = ratatui::init();
+    let startup = wait_for_quran(&mut terminal, &config, show_intro);
+
+    let (surahs, offline_mode) = match startup {
+        Ok(Some(loaded)) => (loaded.surahs, loaded.offline_mode),
+        Ok(None) => {
+            ratatui::restore();
+            return Ok(());
+        }
+        Err(error) => {
+            ratatui::restore();
+            return Err(error.into());
+        }
+    };
+
     if surahs.is_empty() {
+        ratatui::restore();
         return Err("no Quran data is available".into());
     }
 
-    let mut terminal = ratatui::init();
     let mut state = AppState::new(surahs, &config, offline_mode);
-    let result = run_loop(&mut terminal, &mut state);
-    let updated_config = state.to_config(config);
+    let result = run_reader_loop(&mut terminal, &mut state);
+    let mut updated_config = state.to_config(config);
+    if show_intro {
+        updated_config.intro_shown = true;
+    }
     ratatui::restore();
     config::save_config(&updated_config);
     result.map_err(Into::into)
 }
 
-fn run_loop(terminal: &mut DefaultTerminal, state: &mut AppState) -> std::io::Result<()> {
+struct LoadedQuran {
+    surahs: Vec<Surah>,
+    offline_mode: bool,
+}
+
+fn spawn_quran_load() -> Receiver<LoadedQuran> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let loaded = match data::load_quran(false) {
+            Ok(surahs) => LoadedQuran {
+                surahs,
+                offline_mode: false,
+            },
+            Err(_) => LoadedQuran {
+                surahs: data::load_fallback(),
+                offline_mode: true,
+            },
+        };
+        let _ = sender.send(loaded);
+    });
+    receiver
+}
+
+fn wait_for_quran(
+    terminal: &mut DefaultTerminal,
+    config: &Config,
+    show_intro: bool,
+) -> std::io::Result<Option<LoadedQuran>> {
+    let receiver = spawn_quran_load();
+    let mut intro_state = IntroState::new(show_intro);
+    let mut loaded = None;
+    let colors = Theme::from_config(&config.theme).colors();
+
+    loop {
+        if loaded.is_none() {
+            match receiver.try_recv() {
+                Ok(result) => loaded = Some(result),
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    return Err(std::io::Error::other("Quran loading worker stopped"));
+                }
+            }
+        }
+
+        if intro_state.can_enter_reader(loaded.is_some()) {
+            return Ok(loaded);
+        }
+
+        terminal.draw(|frame| intro::render(frame, &intro_state, &colors, loaded.is_some()))?;
+
+        if event::poll(Duration::from_millis(if show_intro { 16 } else { 50 }))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    if key.code == KeyCode::Char('c')
+                        && key.modifiers.contains(KeyModifiers::CONTROL)
+                    {
+                        return Ok(None);
+                    }
+                    intro_state.skip();
+                }
+            }
+        }
+        intro_state.tick();
+    }
+}
+
+fn run_reader_loop(terminal: &mut DefaultTerminal, state: &mut AppState) -> std::io::Result<()> {
     loop {
         state.expire_quit();
         terminal.draw(|frame| ui::draw(frame, state))?;
