@@ -1,0 +1,9 @@
+{
+  "name": "islam-cli",
+  "version": "0.1.0",
+  "description": "Read the Quran in your terminal",
+  "bin": { "islam": "./install.js" },
+  "scripts": { "postinstall": "node install.js" },
+  "keywords": ["quran", "islam", "cli", "terminal", "tui"],
+  "license": "MIT"
+}

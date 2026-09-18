@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux ARM builder
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cargo install cross --locked
+      - name: Test
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        run: cargo test --locked
+      - name: Build Linux ARM
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cross build --release --locked --target ${{ matrix.target }}
+      - name: Build native
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Archive Unix binary
+        if: runner.os != 'Windows'
+        run: tar -C target/${{ matrix.target }}/release -czf islam-${{ matrix.target }}.tar.gz islam
+      - name: Archive Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive target/${{ matrix.target }}/release/islam.exe islam-${{ matrix.target }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: islam-${{ matrix.target }}
+          path: islam-${{ matrix.target }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Generate checksums
+        run: cd artifacts && sha256sum islam-* > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/islam-*.tar.gz
+            artifacts/islam-*.zip
+            artifacts/SHA256SUMS.txt
+
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - name: Set package version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: npm
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+      - name: Publish
+        working-directory: npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

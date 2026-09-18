@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Read the Quran in your terminal"
 license = "MIT"
-repository = "https://github.com/your-github-username/islam-cli"
+repository = "https://github.com/HyperZx2O/qari-cli"
 
 [[bin]]
 name = "islam"
