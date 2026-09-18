@@ -1,3 +1,5 @@
+pub mod hadith;
+pub mod pray;
 pub mod random;
 pub mod read;
 pub mod search;

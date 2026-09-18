@@ -4,6 +4,7 @@ mod commands;
 mod config;
 mod data;
 mod input;
+mod prayer;
 mod quran;
 mod search;
 mod surah_meta;
@@ -35,6 +36,15 @@ enum Commands {
     Random,
     /// Print the ayah of the day
     Today,
+    /// Show prayer times
+    Pray {
+        #[arg(long)]
+        city: Option<String>,
+        #[arg(long)]
+        country: Option<String>,
+    },
+    /// Print the hadith of the day
+    Hadith,
 }
 
 fn main() {
@@ -48,6 +58,18 @@ fn main() {
     let config = config::load_config();
 
     match cli.command {
+        Some(Commands::Pray { city, country }) => {
+            if let Err(error) = commands::pray::run(&config, city.as_deref(), country.as_deref()) {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
+        Some(Commands::Hadith) => {
+            if let Err(error) = commands::hadith::run() {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
         Some(command) => {
             let surahs = data::load_quran(false).unwrap_or_else(|error| {
                 eprintln!("Could not load the complete Quran: {error}");
@@ -59,6 +81,7 @@ fn main() {
                 Commands::Search { query } => commands::search::run(&query, &surahs),
                 Commands::Random => commands::random::run(&surahs, &config),
                 Commands::Today => commands::today::run(&surahs, &config),
+                Commands::Pray { .. } | Commands::Hadith => unreachable!(),
             };
             if let Err(error) = result {
                 eprintln!("{error}");
