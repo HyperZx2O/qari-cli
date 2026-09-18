@@ -12,6 +12,8 @@ pub struct Config {
     pub longitude: f64,
     pub calc_method: u8,
     pub intro_shown: bool,
+    pub reduced_motion: bool,
+    pub rtl_mode: String,
 }
 
 impl Default for Config {
@@ -25,6 +27,8 @@ impl Default for Config {
             longitude: 90.4125,
             calc_method: 0,
             intro_shown: false,
+            reduced_motion: false,
+            rtl_mode: "auto".to_string(),
         }
     }
 }

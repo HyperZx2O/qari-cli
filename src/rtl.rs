@@ -1,7 +1,36 @@
 use arabic_reshaper::ArabicReshaper;
 use std::sync::OnceLock;
 
-pub fn terminal_lines(text: &str, max_width: usize) -> Vec<String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RtlMode {
+    Logical,
+    Visual,
+}
+
+impl RtlMode {
+    pub fn detect(configured: &str) -> Self {
+        let configured = std::env::var("QARI_RTL_MODE").unwrap_or_else(|_| configured.to_string());
+        match configured.to_ascii_lowercase().as_str() {
+            "logical" => Self::Logical,
+            "visual" => Self::Visual,
+            _ if std::env::var_os("VTE_VERSION").is_some() => Self::Logical,
+            _ => Self::Visual,
+        }
+    }
+}
+
+pub fn terminal_lines(text: &str, max_width: usize, mode: RtlMode) -> Vec<String> {
+    let logical_lines = logical_lines(text, max_width);
+    match mode {
+        RtlMode::Logical => logical_lines,
+        RtlMode::Visual => logical_lines
+            .iter()
+            .map(|line| terminal_line(line))
+            .collect(),
+    }
+}
+
+fn logical_lines(text: &str, max_width: usize) -> Vec<String> {
     let max_width = max_width.max(1);
     let mut logical_lines = Vec::new();
     let mut current = String::new();
@@ -26,9 +55,6 @@ pub fn terminal_lines(text: &str, max_width: usize) -> Vec<String> {
     }
 
     logical_lines
-        .iter()
-        .map(|line| terminal_line(line))
-        .collect()
 }
 
 fn terminal_line(text: &str) -> String {
@@ -71,7 +97,7 @@ mod tests {
 
     #[test]
     fn shapes_and_reorders_arabic_for_ltr_terminal_cells() {
-        let lines = terminal_lines("السَّلَامُ عَلَيْكُمْ", 40);
+        let lines = terminal_lines("السَّلَامُ عَلَيْكُمْ", 40, RtlMode::Visual);
         assert_eq!(lines.len(), 1);
         assert!(!lines[0].contains('َ'));
         assert!(lines[0]
@@ -81,9 +107,15 @@ mod tests {
 
     #[test]
     fn wraps_before_visual_reordering() {
-        let lines = terminal_lines("بسم الله الرحمن الرحيم", 8);
+        let lines = terminal_lines("بسم الله الرحمن الرحيم", 8, RtlMode::Visual);
         assert!(lines.len() > 1);
         assert!(lines.iter().all(|line| line.chars().count() <= 8));
         assert_eq!(lines[0], terminal_line("بسم الله"));
+    }
+
+    #[test]
+    fn logical_mode_preserves_uthmani_marks() {
+        let lines = terminal_lines("السَّلَامُ عَلَيْكُمْ", 40, RtlMode::Logical);
+        assert!(lines[0].contains('َ'));
     }
 }

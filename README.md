@@ -2,8 +2,6 @@
 
 A full-screen Quran reader for the terminal, with Arabic, Sahih International English, and Muhiuddin Khan Bengali text.
 
-![demo](assets/demo.gif)
-
 ## Install
 
 ```sh
@@ -42,7 +40,7 @@ Subcommand output contains no ANSI escapes when piped.
 | Key | Action |
 |---|---|
 | `h`/`l`, `←`/`→` | Switch panel |
-| `j`/`k`, `↓`/`↑` | Navigate |
+| `j`/`k`, `↓`/`↑` | Navigate lists or scroll Scripture/help |
 | `/` | Live search |
 | `Enter` | Select result/panel |
 | `y` or `c` | Copy ayah |
@@ -65,6 +63,8 @@ Subcommand output contains no ANSI escapes when piped.
 Unicode-capable terminals such as Windows Terminal, iTerm2, Kitty, Alacritty, and GNOME Terminal are supported. Arabic/Bengali glyph quality depends on installed fonts and terminal shaping support.
 
 The full-screen TUI shapes Arabic into terminal-safe visual order and omits combining recitation marks so terminal cursor positions remain stable. Plain CLI output and copied ayahs retain the original Uthmani text with all marks.
+
+Configuration is stored in `~/.config/qari-cli/config.toml` (or the platform-equivalent config directory). Set `reduced_motion = true` to disable the animated intro. Arabic rendering defaults to `rtl_mode = "auto"`; use `"logical"` for terminals with native BiDi support or `"visual"` for traditional LTR terminal grids. `QARI_RTL_MODE` can override this per launch.
 
 Built with Rust, Ratatui, Crossterm, alquran.cloud, AlAdhan, and the fawazahmed0 hadith dataset.
 

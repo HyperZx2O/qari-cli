@@ -4,6 +4,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
+use std::time::{Duration, Instant};
 
 const MARK_ART: &[&str] = &[
     "              ╭──────╮              ",
@@ -31,6 +32,7 @@ pub struct IntroState {
     tick: u32,
     skipped: bool,
     animated: bool,
+    started: Instant,
 }
 
 impl IntroState {
@@ -39,6 +41,7 @@ impl IntroState {
             tick: if animated { 0 } else { INTRO_END_TICK + 1 },
             skipped: false,
             animated,
+            started: Instant::now(),
         }
     }
 
@@ -64,6 +67,10 @@ impl IntroState {
             _ => 3,
         }
     }
+
+    fn loading_visible(&self) -> bool {
+        self.animated || self.started.elapsed() >= Duration::from_millis(150)
+    }
 }
 
 pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_ready: bool) {
@@ -78,9 +85,12 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
         return;
     }
 
-    let [content] = Layout::vertical([Constraint::Length(19)])
+    let [vertical] = Layout::vertical([Constraint::Length(19)])
         .flex(Flex::Center)
         .areas(area);
+    let [content] = Layout::horizontal([Constraint::Length(48)])
+        .flex(Flex::Center)
+        .areas(vertical);
     let [mark_area, title_area, tagline_area, loading_area, hint_area] = Layout::vertical([
         Constraint::Length(8),
         Constraint::Length(6),
@@ -132,17 +142,17 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
         };
         frame.render_widget(
             Paragraph::new(tagline.chars().take(visible).collect::<String>())
-                .alignment(Alignment::Center)
+                .alignment(Alignment::Left)
                 .style(Style::default().fg(colors.muted)),
             tagline_area,
         );
     }
 
-    render_loading(frame, loading_area, state.tick, colors, data_ready);
+    render_loading(frame, loading_area, state, colors, data_ready);
     frame.render_widget(
         Paragraph::new("Press any key to skip")
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(colors.border)),
+            .alignment(Alignment::Right)
+            .style(Style::default().fg(colors.muted)),
         hint_area,
     );
 }
@@ -164,7 +174,11 @@ fn render_compact(
                 .fg(colors.accent)
                 .add_modifier(Modifier::BOLD),
         ),
-        loading_line(state.tick, colors, data_ready),
+        if state.loading_visible() {
+            loading_line(state.tick, colors, data_ready)
+        } else {
+            Line::from("")
+        },
     ];
     frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), content);
 }
@@ -181,12 +195,12 @@ fn render_art(frame: &mut Frame, area: Rect, art: &[&str], color: Color, bold: b
 fn render_loading(
     frame: &mut Frame,
     area: Rect,
-    tick: u32,
+    state: &IntroState,
     colors: &ThemeColors,
     data_ready: bool,
 ) {
     frame.render_widget(
-        Paragraph::new(loading_line(tick, colors, data_ready)).alignment(Alignment::Center),
+        Paragraph::new(loading_line(state.tick, colors, data_ready)).alignment(Alignment::Left),
         area,
     );
 }
@@ -243,6 +257,12 @@ mod tests {
         state.skip();
         assert!(!state.can_enter_reader(false));
         assert!(state.can_enter_reader(true));
+    }
+
+    #[test]
+    fn compact_loading_indicator_is_delayed() {
+        let state = IntroState::new(false);
+        assert!(!state.loading_visible());
     }
 
     #[test]

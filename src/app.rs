@@ -3,6 +3,7 @@ use crate::data;
 use crate::input::{self, AppAction};
 use crate::intro::{self, IntroState};
 use crate::quran::Surah;
+use crate::rtl::RtlMode;
 use crate::search::{search_quran, SearchResult};
 use crate::theme::Theme;
 use crate::ui;
@@ -75,12 +76,18 @@ pub struct AppState {
     pub show_help: bool,
     pub offline_mode: bool,
     pub status_msg: Option<String>,
+    pub status_error: bool,
     pub quit_count: u8,
     pub(crate) quit_started: Option<Instant>,
     pub surah_list: ListState,
     pub ayah_list: ListState,
     pub search_list: ListState,
     pub bookmark_conn: Option<rusqlite::Connection>,
+    pub bookmarked: bool,
+    pub scripture_scroll: u16,
+    pub help_scroll: u16,
+    pub rtl_mode: RtlMode,
+    pub(crate) status_started: Option<Instant>,
 }
 
 impl AppState {
@@ -105,11 +112,23 @@ impl AppState {
         ayah_list.select(Some(current_ayah));
 
         let bookmark_conn = crate::bookmarks::init_db().ok();
+        let bookmarked = bookmark_conn.as_ref().is_some_and(|conn| {
+            surahs
+                .get(current_surah)
+                .and_then(|surah| {
+                    surah
+                        .ayahs
+                        .get(current_ayah)
+                        .map(|ayah| (surah.number, ayah.number))
+                })
+                .is_some_and(|(surah, ayah)| crate::bookmarks::is_bookmarked(conn, surah, ayah))
+        });
         let status_msg = if bookmark_conn.is_none() {
             Some("Bookmarks unavailable".to_string())
         } else {
             None
         };
+        let status_started = status_msg.as_ref().map(|_| Instant::now());
 
         Self {
             surahs,
@@ -124,12 +143,18 @@ impl AppState {
             show_help: false,
             offline_mode,
             status_msg,
+            status_error: bookmark_conn.is_none(),
             quit_count: 0,
             quit_started: None,
             surah_list,
             ayah_list,
             search_list: ListState::default(),
             bookmark_conn,
+            bookmarked,
+            scripture_scroll: 0,
+            help_scroll: 0,
+            rtl_mode: RtlMode::detect(&config.rtl_mode),
+            status_started,
         }
     }
 
@@ -184,17 +209,21 @@ impl AppState {
             AppAction::ToggleBookmark => self.toggle_bookmark(),
             AppAction::CycleTheme => {
                 self.theme = self.theme.next();
-                self.status_msg = Some(format!("Theme: {}", self.theme.label()));
+                self.set_status(format!("Theme: {}", self.theme.label()));
             }
             AppAction::CycleLanguage => {
                 self.language = self.language.next();
-                self.status_msg = Some(format!("Language: {}", self.language.label()));
+                self.scripture_scroll = 0;
+                self.set_status(format!("Language: {}", self.language.label()));
             }
-            AppAction::ToggleHelp => self.show_help = !self.show_help,
+            AppAction::ToggleHelp => {
+                self.show_help = !self.show_help;
+                self.help_scroll = 0;
+            }
             AppAction::QuitOne => {
                 self.quit_count = 1;
                 self.quit_started = Some(Instant::now());
-                self.status_msg = Some("Press q again to quit".to_string());
+                self.set_status("Press q again to quit");
             }
             AppAction::QuitConfirm => return true,
             AppAction::Noop => {}
@@ -202,13 +231,25 @@ impl AppState {
         false
     }
 
-    pub fn expire_quit(&mut self) {
+    pub fn expire_transients(&mut self) -> bool {
+        let mut changed = false;
         if self
             .quit_started
             .is_some_and(|started| started.elapsed() > Duration::from_millis(500))
         {
             self.reset_quit();
+            changed = true;
         }
+        if self
+            .status_started
+            .is_some_and(|started| started.elapsed() > Duration::from_secs(2))
+        {
+            self.status_msg = None;
+            self.status_error = false;
+            self.status_started = None;
+            changed = true;
+        }
+        changed
     }
 
     pub fn to_config(&self, mut config: Config) -> Config {
@@ -227,6 +268,15 @@ impl AppState {
     }
 
     fn move_selection(&mut self, down: bool) {
+        if self.show_help {
+            self.help_scroll = if down {
+                self.help_scroll.saturating_add(1)
+            } else {
+                self.help_scroll.saturating_sub(1)
+            };
+            return;
+        }
+
         if self.search_mode {
             let len = self.search_results.len();
             if len == 0 {
@@ -253,10 +303,19 @@ impl AppState {
                     self.current_surah.saturating_sub(1)
                 };
                 self.current_ayah = 0;
+                self.scripture_scroll = 0;
                 self.surah_list.select(Some(self.current_surah));
                 self.ayah_list.select(Some(0));
+                self.refresh_bookmark();
             }
-            Panel::Ayahs | Panel::Scripture => {
+            Panel::Scripture => {
+                self.scripture_scroll = if down {
+                    self.scripture_scroll.saturating_add(1)
+                } else {
+                    self.scripture_scroll.saturating_sub(1)
+                };
+            }
+            Panel::Ayahs => {
                 let len = self.current_surah().map_or(0, |surah| surah.ayahs.len());
                 if len == 0 {
                     return;
@@ -266,7 +325,9 @@ impl AppState {
                 } else {
                     self.current_ayah.saturating_sub(1)
                 };
+                self.scripture_scroll = 0;
                 self.ayah_list.select(Some(self.current_ayah));
+                self.refresh_bookmark();
             }
         }
     }
@@ -295,10 +356,12 @@ impl AppState {
                 self.surah_list.select(Some(self.current_surah));
                 self.ayah_list.select(Some(self.current_ayah));
                 self.active_panel = Panel::Scripture;
+                self.scripture_scroll = 0;
                 self.search_mode = false;
                 self.search_query.clear();
                 self.search_results.clear();
                 self.search_list.select(None);
+                self.refresh_bookmark();
             }
             return;
         }
@@ -332,11 +395,10 @@ impl AppState {
             "{} {}:{}\n{}{}",
             surah.name_transliterated, surah.number, ayah.number, ayah.arabic, translation
         );
-        self.status_msg =
-            match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.set_text(text)) {
-                Ok(()) => Some(format!("Copied {}:{}", surah.number, ayah.number)),
-                Err(_) => Some("Copy failed — clipboard unavailable".to_string()),
-            };
+        match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.set_text(text)) {
+            Ok(()) => self.set_status(format!("Copied {}:{}", surah.number, ayah.number)),
+            Err(_) => self.set_error("Copy failed — clipboard unavailable"),
+        }
     }
 
     fn toggle_bookmark(&mut self) {
@@ -348,22 +410,62 @@ impl AppState {
         };
         let (surah_number, ayah_number) = (surah.number, ayah.number);
         let Some(conn) = &self.bookmark_conn else {
-            self.status_msg = Some("Bookmarks unavailable".to_string());
+            self.set_error("Bookmarks unavailable");
             return;
         };
 
-        if let Some(id) = crate::bookmarks::bookmark_id(conn, surah_number, ayah_number) {
-            self.status_msg = match crate::bookmarks::delete_bookmark(conn, id) {
-                Ok(()) => Some(format!("Removed bookmark {surah_number}:{ayah_number}")),
-                Err(_) => Some("Could not remove bookmark".to_string()),
-            };
-        } else {
-            self.status_msg =
+        let (bookmarked, message, error) =
+            if let Some(id) = crate::bookmarks::bookmark_id(conn, surah_number, ayah_number) {
+                match crate::bookmarks::delete_bookmark(conn, id) {
+                    Ok(()) => (
+                        false,
+                        format!("Removed bookmark {surah_number}:{ayah_number}"),
+                        false,
+                    ),
+                    Err(_) => (true, "Could not remove bookmark".to_string(), true),
+                }
+            } else {
                 match crate::bookmarks::add_bookmark(conn, surah_number, ayah_number, "", "") {
-                    Ok(_) => Some(format!("Bookmarked {surah_number}:{ayah_number}")),
-                    Err(_) => Some("Could not add bookmark".to_string()),
-                };
+                    Ok(_) => (
+                        true,
+                        format!("Bookmarked {surah_number}:{ayah_number}"),
+                        false,
+                    ),
+                    Err(_) => (false, "Could not add bookmark".to_string(), true),
+                }
+            };
+        self.bookmarked = bookmarked;
+        if error {
+            self.set_error(message);
+        } else {
+            self.set_status(message);
         }
+    }
+
+    fn refresh_bookmark(&mut self) {
+        self.bookmarked = self.bookmark_conn.as_ref().is_some_and(|conn| {
+            self.surahs
+                .get(self.current_surah)
+                .and_then(|surah| {
+                    surah
+                        .ayahs
+                        .get(self.current_ayah)
+                        .map(|ayah| (surah.number, ayah.number))
+                })
+                .is_some_and(|(surah, ayah)| crate::bookmarks::is_bookmarked(conn, surah, ayah))
+        });
+    }
+
+    fn set_status(&mut self, message: impl Into<String>) {
+        self.status_msg = Some(message.into());
+        self.status_error = false;
+        self.status_started = Some(Instant::now());
+    }
+
+    fn set_error(&mut self, message: impl Into<String>) {
+        self.status_msg = Some(message.into());
+        self.status_error = true;
+        self.status_started = Some(Instant::now());
     }
 
     fn reset_quit(&mut self) {
@@ -371,6 +473,8 @@ impl AppState {
         self.quit_started = None;
         if self.status_msg.as_deref() == Some("Press q again to quit") {
             self.status_msg = None;
+            self.status_error = false;
+            self.status_started = None;
         }
     }
 }
@@ -436,7 +540,8 @@ fn wait_for_quran(
     show_intro: bool,
 ) -> std::io::Result<Option<LoadedQuran>> {
     let receiver = spawn_quran_load();
-    let mut intro_state = IntroState::new(show_intro);
+    let animate_intro = show_intro && !config.reduced_motion;
+    let mut intro_state = IntroState::new(animate_intro);
     let mut loaded = None;
     let colors = Theme::from_config(&config.theme).colors();
 
@@ -457,7 +562,7 @@ fn wait_for_quran(
 
         terminal.draw(|frame| intro::render(frame, &intro_state, &colors, loaded.is_some()))?;
 
-        if event::poll(Duration::from_millis(if show_intro { 16 } else { 50 }))? {
+        if event::poll(Duration::from_millis(if animate_intro { 16 } else { 50 }))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     if key.code == KeyCode::Char('c')
@@ -474,19 +579,27 @@ fn wait_for_quran(
 }
 
 fn run_reader_loop(terminal: &mut DefaultTerminal, state: &mut AppState) -> std::io::Result<()> {
+    let mut dirty = true;
     loop {
-        state.expire_quit();
-        terminal.draw(|frame| ui::draw(frame, state))?;
+        if dirty {
+            terminal.draw(|frame| ui::draw(frame, state))?;
+            dirty = false;
+        }
 
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
+        if event::poll(Duration::from_millis(100))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
                     let action = input::handle_key(key, state);
                     if state.apply_action(action) {
                         return Ok(());
                     }
+                    dirty = true;
                 }
+                Event::Resize(_, _) => dirty = true,
+                _ => {}
             }
+        } else if state.expire_transients() {
+            dirty = true;
         }
     }
 }

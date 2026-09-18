@@ -33,6 +33,8 @@ pub fn handle_key(key: KeyEvent, state: &AppState) -> AppAction {
             KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Enter => {
                 AppAction::ToggleHelp
             }
+            KeyCode::Up | KeyCode::Char('k') => AppAction::SelectUp,
+            KeyCode::Down | KeyCode::Char('j') => AppAction::SelectDown,
             _ => AppAction::Noop,
         };
     }

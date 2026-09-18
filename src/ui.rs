@@ -1,10 +1,14 @@
 use crate::app::{AppState, Language, Panel};
 use crate::theme::ThemeColors;
 use ratatui::layout::{Alignment, Constraint, Flex, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
+    ScrollbarState, Wrap,
+};
 use ratatui::Frame;
+use unicode_width::UnicodeWidthStr;
 
 pub fn draw(frame: &mut Frame, state: &mut AppState) {
     let area = frame.area();
@@ -20,24 +24,34 @@ pub fn draw(frame: &mut Frame, state: &mut AppState) {
         Constraint::Length(1),
     ])
     .areas(area);
-    let panels = Layout::horizontal([
-        Constraint::Percentage(20),
-        Constraint::Percentage(15),
-        Constraint::Percentage(65),
-    ])
-    .split(panels_area);
-
     render_header(frame, header_area, state, &colors);
-    render_surahs(frame, panels[0], state, &colors);
-    render_ayahs(frame, panels[1], state, &colors);
-    render_scripture(frame, panels[2], state, &colors);
+    let scripture_area = if panels_area.width < 72 {
+        match state.active_panel {
+            Panel::Surahs => render_surahs(frame, panels_area, state, &colors),
+            Panel::Ayahs => render_ayahs(frame, panels_area, state, &colors),
+            Panel::Scripture => render_scripture(frame, panels_area, state, &colors),
+        }
+        panels_area
+    } else {
+        let surah_width = if panels_area.width < 100 { 24 } else { 30 };
+        let panels = Layout::horizontal([
+            Constraint::Length(surah_width),
+            Constraint::Length(12),
+            Constraint::Min(24),
+        ])
+        .split(panels_area);
+        render_surahs(frame, panels[0], state, &colors);
+        render_ayahs(frame, panels[1], state, &colors);
+        render_scripture(frame, panels[2], state, &colors);
+        panels[2]
+    };
     render_footer(frame, footer_area, state, &colors);
 
     if state.search_mode {
-        render_search_overlay(frame, panels[2], state, &colors);
+        render_search_overlay(frame, scripture_area, state, &colors);
     }
     if state.show_help {
-        render_help(frame, area, &colors);
+        render_help(frame, area, state, &colors);
     }
 }
 
@@ -48,6 +62,25 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, colors: &Theme
     let Some(ayah) = surah.ayahs.get(state.current_ayah) else {
         return;
     };
+    let location = if area.width >= 72 {
+        format!(
+            "◆ {} {}:{} ◆ Juz {} ◆ [{}] ◆ [{}]",
+            surah.name_transliterated,
+            surah.number,
+            ayah.number,
+            ayah.juz,
+            state.language.label(),
+            state.theme.label()
+        )
+    } else {
+        format!(
+            "{} {}:{} [{}]",
+            surah.name_transliterated,
+            surah.number,
+            ayah.number,
+            state.language.label()
+        )
+    };
     let mut spans = vec![
         Span::styled(
             " qari-cli ",
@@ -55,23 +88,14 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, colors: &Theme
                 .fg(colors.accent)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            format!(
-                "◆ {} {}:{} ◆ Juz {} ◆ [{}] ◆ [{}]",
-                surah.name_transliterated,
-                surah.number,
-                ayah.number,
-                ayah.juz,
-                state.language.label(),
-                state.theme.label()
-            ),
-            Style::default().fg(colors.foreground),
-        ),
+        Span::styled(location, Style::default().fg(colors.foreground)),
     ];
     if state.offline_mode {
         spans.push(Span::styled(
             " ◆ [OFFLINE]",
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(colors.danger)
+                .add_modifier(Modifier::BOLD),
         ));
     }
     frame.render_widget(
@@ -93,16 +117,19 @@ fn render_surahs(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &T
             ))
         })
         .collect();
+    let highlight_style = if active {
+        Style::default()
+            .bg(colors.highlight)
+            .fg(colors.accent)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(colors.foreground)
+    };
     let list = List::new(items)
         .block(panel_block(" Surahs ", active, colors))
         .style(Style::default().fg(colors.foreground))
-        .highlight_style(
-            Style::default()
-                .bg(colors.highlight)
-                .fg(colors.accent)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("▶ ");
+        .highlight_style(highlight_style)
+        .highlight_symbol(if active { "▶ " } else { "  " });
     frame.render_stateful_widget(list, area, &mut state.surah_list);
 }
 
@@ -119,93 +146,134 @@ fn render_ayahs(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &Th
                 .collect()
         })
         .unwrap_or_default();
+    let highlight_style = if active {
+        Style::default()
+            .bg(colors.highlight)
+            .fg(colors.accent)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(colors.foreground)
+    };
     let list = List::new(items)
         .block(panel_block(" Ayahs ", active, colors))
         .style(Style::default().fg(colors.foreground))
-        .highlight_style(
-            Style::default()
-                .bg(colors.highlight)
-                .fg(colors.accent)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("▶ ");
+        .highlight_style(highlight_style)
+        .highlight_symbol(if active { "▶ " } else { "  " });
     frame.render_stateful_widget(list, area, &mut state.ayah_list);
 }
 
-fn render_scripture(frame: &mut Frame, area: Rect, state: &AppState, colors: &ThemeColors) {
+fn render_scripture(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &ThemeColors) {
     let active = state.active_panel == Panel::Scripture && !state.search_mode;
     let block = panel_block(" Scripture ", active, colors);
     let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let content_width = inner.width.saturating_sub(1).max(1) as usize;
 
-    let Some(surah) = state.surahs.get(state.current_surah) else {
-        return;
-    };
-    let Some(ayah) = surah.ayahs.get(state.current_ayah) else {
-        return;
-    };
-
-    let [arabic_area, translation_area, metadata_area] = Layout::vertical([
-        Constraint::Percentage(45),
-        Constraint::Min(2),
-        Constraint::Length(2),
-    ])
-    .areas(inner);
-
-    let arabic_lines: Vec<Line> =
-        crate::rtl::terminal_lines(&ayah.arabic, arabic_area.width.saturating_sub(1) as usize)
-            .into_iter()
-            .map(|line| {
-                Line::styled(
-                    line,
-                    Style::default()
-                        .fg(colors.foreground)
-                        .add_modifier(Modifier::BOLD),
+    let Some((arabic, english, bengali, metadata_one, metadata_two)) =
+        state.surahs.get(state.current_surah).and_then(|surah| {
+            surah.ayahs.get(state.current_ayah).map(|ayah| {
+                (
+                    ayah.arabic.clone(),
+                    ayah.english.clone(),
+                    ayah.bengali.clone(),
+                    format!(
+                        "Surah: {} ({})",
+                        surah.name_transliterated,
+                        if surah.is_meccan { "Meccan" } else { "Medinan" }
+                    ),
+                    format!(
+                        "Juz {} · Page {} · Ayah {}/{}",
+                        ayah.juz, ayah.page, ayah.number, surah.ayah_count
+                    ),
                 )
             })
-            .collect();
-    let arabic = Paragraph::new(arabic_lines)
-        .alignment(Alignment::Right)
-        .wrap(Wrap { trim: false });
-    frame.render_widget(arabic, arabic_area);
-
-    let translation = match state.language {
-        Language::Arabic => vec![Line::styled(
-            "Arabic-only view",
-            Style::default().fg(colors.muted),
-        )],
-        Language::English => vec![Line::from(ayah.english.as_str())],
-        Language::Bengali => vec![
-            Line::from(ayah.english.as_str()),
-            Line::from(""),
-            Line::from(ayah.bengali.as_str()),
-        ],
+        })
+    else {
+        frame.render_widget(block, area);
+        return;
     };
+
+    let arabic_lines = crate::rtl::terminal_lines(&arabic, content_width, state.rtl_mode);
+    let mut lines: Vec<Line> = arabic_lines
+        .iter()
+        .map(|line| {
+            Line::styled(
+                line.clone(),
+                Style::default()
+                    .fg(colors.foreground)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .alignment(Alignment::Right)
+        })
+        .collect();
+    lines.push(Line::from(""));
+
+    let mut content_height = arabic_lines.len() + 1;
+    match state.language {
+        Language::Arabic => {}
+        Language::English => {
+            content_height += wrapped_height(&english, content_width);
+            lines.push(Line::styled(
+                english,
+                Style::default().fg(colors.foreground),
+            ));
+        }
+        Language::Bengali => {
+            content_height += wrapped_height(&english, content_width) + 1;
+            lines.push(Line::styled(
+                english,
+                Style::default().fg(colors.foreground),
+            ));
+            lines.push(Line::from(""));
+            content_height += wrapped_height(&bengali, content_width);
+            lines.push(Line::styled(
+                bengali,
+                Style::default().fg(colors.foreground),
+            ));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        metadata_one.clone(),
+        Style::default().fg(colors.muted),
+    ));
+    lines.push(Line::styled(
+        metadata_two.clone(),
+        Style::default().fg(colors.muted),
+    ));
+    content_height += 1
+        + wrapped_height(&metadata_one, content_width)
+        + wrapped_height(&metadata_two, content_width);
+    if state.bookmarked {
+        lines.push(Line::styled(
+            "★ Bookmarked",
+            Style::default()
+                .fg(colors.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+        content_height += 1;
+    }
+
+    let max_scroll = content_height.saturating_sub(inner.height as usize) as u16;
+    state.scripture_scroll = state.scripture_scroll.min(max_scroll);
     frame.render_widget(
-        Paragraph::new(translation)
-            .style(Style::default().fg(colors.foreground))
-            .wrap(Wrap { trim: false }),
-        translation_area,
+        Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((state.scripture_scroll, 0)),
+        area,
     );
 
-    let metadata = vec![
-        Line::styled(
-            format!(
-                "Surah: {} ({})",
-                surah.name_transliterated,
-                if surah.is_meccan { "Meccan" } else { "Medinan" }
-            ),
-            Style::default().fg(colors.muted),
-        ),
-        Line::styled(
-            format!(
-                "Juz {} · Page {} · Ayah {}/{}",
-                ayah.juz, ayah.page, ayah.number, surah.ayah_count
-            ),
-            Style::default().fg(colors.muted),
-        ),
-    ];
-    frame.render_widget(Paragraph::new(metadata), metadata_area);
+    if max_scroll > 0 {
+        let mut scrollbar_state =
+            ScrollbarState::new(max_scroll as usize).position(state.scripture_scroll as usize);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .style(Style::default().fg(colors.accent)),
+            inner,
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn render_footer(frame: &mut Frame, area: Rect, state: &AppState, colors: &ThemeColors) {
@@ -224,16 +292,28 @@ fn render_footer(frame: &mut Frame, area: Rect, state: &AppState, colors: &Theme
         ])
     } else if let Some(message) = &state.status_msg {
         Line::styled(
-            format!(" {message}"),
+            format!(" {}{message}", if state.status_error { "! " } else { "" }),
             Style::default()
-                .fg(colors.accent)
+                .fg(if state.status_error {
+                    colors.danger
+                } else {
+                    colors.accent
+                })
                 .add_modifier(Modifier::BOLD),
         )
     } else {
-        Line::styled(
-            " j/k navigate · h/l panels · / search · y copy · b bookmark · t theme · v language · ? help · qq quit",
-            Style::default().fg(colors.muted),
-        )
+        let hint = if area.width >= 108 {
+            if state.active_panel == Panel::Scripture {
+                " j/k scroll · h/l panels · / search · y copy · b bookmark · t theme · v language · ? help · qq quit"
+            } else {
+                " j/k navigate · h/l panels · / search · y copy · b bookmark · t theme · v language · ? help · qq quit"
+            }
+        } else if area.width >= 64 {
+            " j/k move · h/l panels · / search · ? help · qq quit"
+        } else {
+            " j/k · h/l · / · ? · qq"
+        };
+        Line::styled(hint, Style::default().fg(colors.muted))
     };
     frame.render_widget(
         Paragraph::new(line).style(Style::default().bg(colors.surface)),
@@ -255,6 +335,7 @@ fn render_search_overlay(
     };
     frame.render_widget(Clear, area);
 
+    let result_width = area.width.saturating_sub(18).clamp(12, 72) as usize;
     let items: Vec<ListItem> = state
         .search_results
         .iter()
@@ -264,7 +345,7 @@ fn render_search_overlay(
                 result.surah_number,
                 result.ayah_number,
                 result.surah_name,
-                truncate(&result.english_text, 60)
+                truncate(&result.english_text, result_width)
             ))
         })
         .collect();
@@ -276,7 +357,12 @@ fn render_search_overlay(
     let list = List::new(items)
         .block(
             Block::default()
-                .title(title)
+                .title(Span::styled(
+                    title,
+                    Style::default()
+                        .fg(colors.accent)
+                        .add_modifier(Modifier::BOLD),
+                ))
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(colors.accent))
                 .style(Style::default().bg(colors.surface)),
@@ -292,8 +378,17 @@ fn render_search_overlay(
     frame.render_stateful_widget(list, area, &mut state.search_list);
 }
 
-fn render_help(frame: &mut Frame, area: Rect, colors: &ThemeColors) {
-    let popup = centered_rect(66, 70, area);
+fn render_help(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &ThemeColors) {
+    let popup = if area.width < 72 || area.height < 22 {
+        Rect {
+            x: area.x.saturating_add(1),
+            y: area.y.saturating_add(1),
+            width: area.width.saturating_sub(2),
+            height: area.height.saturating_sub(2),
+        }
+    } else {
+        centered_rect(66, 70, area)
+    };
     frame.render_widget(Clear, popup);
     let help = vec![
         Line::from(""),
@@ -311,6 +406,9 @@ fn render_help(frame: &mut Frame, area: Rect, colors: &ThemeColors) {
         Line::from("  qq        Quit"),
         Line::from("  Ctrl+C    Quit immediately"),
     ];
+    let visible_rows = popup.height.saturating_sub(2) as usize;
+    let max_scroll = help.len().saturating_sub(visible_rows) as u16;
+    state.help_scroll = state.help_scroll.min(max_scroll);
     frame.render_widget(
         Paragraph::new(help)
             .block(
@@ -320,17 +418,50 @@ fn render_help(frame: &mut Frame, area: Rect, colors: &ThemeColors) {
                     .border_style(Style::default().fg(colors.accent))
                     .style(Style::default().bg(colors.surface)),
             )
-            .style(Style::default().fg(colors.foreground)),
+            .style(Style::default().fg(colors.foreground))
+            .wrap(Wrap { trim: false })
+            .scroll((state.help_scroll, 0)),
         popup,
     );
 }
 
 fn panel_block(title: &'static str, active: bool, colors: &ThemeColors) -> Block<'static> {
+    let title = if active {
+        format!(" > {} ", title.trim())
+    } else {
+        title.to_string()
+    };
     Block::default()
-        .title(title)
+        .title(Span::styled(
+            title,
+            Style::default()
+                .fg(if active { colors.accent } else { colors.muted })
+                .add_modifier(if active {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+        ))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(if active { colors.accent } else { colors.border }))
         .style(Style::default().bg(colors.surface))
+}
+
+fn wrapped_height(text: &str, width: usize) -> usize {
+    let width = width.max(1);
+    let mut rows = 1usize;
+    let mut column = 0usize;
+    for word in text.split_whitespace() {
+        let word_width = UnicodeWidthStr::width(word);
+        let separator = usize::from(column > 0);
+        if column > 0 && column + separator + word_width > width {
+            rows += 1;
+            column = word_width;
+        } else {
+            column += separator + word_width;
+        }
+    }
+    rows
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
@@ -379,8 +510,8 @@ mod tests {
             }
         }
 
-        assert_eq!(buffer[(23, 5)].symbol(), "│");
-        assert_eq!(buffer[(24, 5)].symbol(), "│");
+        assert_eq!(buffer[(29, 5)].symbol(), "│");
+        assert_eq!(buffer[(30, 5)].symbol(), "│");
         assert_eq!(buffer[(41, 5)].symbol(), "│");
         assert_eq!(buffer[(42, 5)].symbol(), "│");
     }
@@ -411,6 +542,44 @@ mod tests {
         assert_eq!(rendered.matches("Page 1").count(), 1);
     }
 
+    #[test]
+    fn long_scripture_scrolls_to_metadata() {
+        let mut state = test_state();
+        state.active_panel = Panel::Scripture;
+        state.surahs[0].ayahs[0].english = "A long translated passage ".repeat(120);
+        state.scripture_scroll = u16::MAX;
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut state)).unwrap();
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(state.scripture_scroll > 0);
+        assert!(rendered.contains("Surah: Al-Fatihah"));
+        assert!(rendered.contains("Ayah 1/7"));
+    }
+
+    #[test]
+    fn narrow_terminal_shows_only_active_panel() {
+        let mut state = test_state();
+        state.active_panel = Panel::Scripture;
+        let mut terminal = Terminal::new(TestBackend::new(60, 18)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut state)).unwrap();
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(rendered.contains("Scripture"));
+        assert!(!rendered.contains("Surahs"));
+        assert!(!rendered.contains("Ayahs"));
+    }
+
     fn test_state() -> AppState {
         let surahs = crate::data::load_fallback();
         let mut surah_list = ListState::default();
@@ -431,12 +600,18 @@ mod tests {
             show_help: false,
             offline_mode: false,
             status_msg: None,
+            status_error: false,
             quit_count: 0,
             quit_started: None,
             surah_list,
             ayah_list,
             search_list: ListState::default(),
             bookmark_conn: None,
+            bookmarked: false,
+            scripture_scroll: 0,
+            help_scroll: 0,
+            rtl_mode: crate::rtl::RtlMode::Visual,
+            status_started: None,
         }
     }
 

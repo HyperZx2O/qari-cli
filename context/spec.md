@@ -116,7 +116,7 @@ Binary reads cached JSON from disk → deserialises into `Vec<Surah>` → launch
 - `SurahMeta` — const array of 114 entries embedded at compile time (ported from `surah_meta.c`); fields: number, name, meaning, is_meccan, revelation_order, ayah_count
 - `AppState` — `current_surah: usize`, `current_ayah: usize`, `active_panel: Panel`, `language: Language`, `theme: Theme`, `search_mode: bool`, `search_query: String`, `bookmarks: Vec<Bookmark>`
 - `Bookmark` — `surah_id: u8`, `ayah_id: u16`, `tag: String`, `note: String`, `timestamp: i64` (SQLite schema from Ayatika)
-- `Config` — `last_surah: u8`, `last_ayah: u16`, `language: String`, `theme: String`, `latitude: f64`, `longitude: f64`, `calc_method: u8`, `intro_shown: bool`
+- `Config` — persisted reading position, language, theme, location, calculation method, intro state, reduced-motion preference, and terminal RTL mode
 
 ---
 
