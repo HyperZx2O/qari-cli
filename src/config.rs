@@ -10,10 +10,13 @@ pub struct Config {
     pub theme: String,
     pub latitude: f64,
     pub longitude: f64,
-    pub calc_method: u8,
+    pub collection: String,
+    pub last_book: String,
+    pub last_chapter: u32,
     pub intro_shown: bool,
     pub reduced_motion: bool,
     pub rtl_mode: String,
+    pub transliteration: bool,
 }
 
 impl Default for Config {
@@ -25,10 +28,13 @@ impl Default for Config {
             theme: "dark".to_string(),
             latitude: 23.8103,
             longitude: 90.4125,
-            calc_method: 0,
+            collection: "quran".to_string(),
+            last_book: String::new(),
+            last_chapter: 1,
             intro_shown: false,
             reduced_motion: false,
             rtl_mode: "auto".to_string(),
+            transliteration: false,
         }
     }
 }
@@ -65,7 +71,6 @@ language = "en"
 theme = "dark"
 latitude = 23.8103
 longitude = 90.4125
-calc_method = 0
 "#,
         )
         .unwrap();

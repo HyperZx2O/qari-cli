@@ -8,8 +8,9 @@ pub enum RtlMode {
 }
 
 impl RtlMode {
+    /// `logical`/`visual` from config; otherwise logical on VTE terminals,
+    /// which do their own BiDi shaping, and visual everywhere else.
     pub fn detect(configured: &str) -> Self {
-        let configured = std::env::var("QARI_RTL_MODE").unwrap_or_else(|_| configured.to_string());
         match configured.to_ascii_lowercase().as_str() {
             "logical" => Self::Logical,
             "visual" => Self::Visual,
@@ -20,6 +21,11 @@ impl RtlMode {
 }
 
 pub fn terminal_lines(text: &str, max_width: usize, mode: RtlMode) -> Vec<String> {
+    // Greek (and any other left-to-right script) needs wrapping only:
+    // reversing it would print it backwards.
+    if !is_rtl(text) {
+        return crate::wrap::wrap_text(text, max_width);
+    }
     let logical_lines = logical_lines(text, max_width);
     match mode {
         RtlMode::Logical => logical_lines,
@@ -28,6 +34,15 @@ pub fn terminal_lines(text: &str, max_width: usize, mode: RtlMode) -> Vec<String
             .map(|line| terminal_line(line))
             .collect(),
     }
+}
+
+fn is_rtl(text: &str) -> bool {
+    text.chars().any(|character| {
+        matches!(
+            character as u32,
+            0x0590..=0x05FF | 0x0600..=0x06FF | 0xFB50..=0xFDFF | 0xFE70..=0xFEFF
+        )
+    })
 }
 
 fn logical_lines(text: &str, max_width: usize) -> Vec<String> {
@@ -58,6 +73,17 @@ fn logical_lines(text: &str, max_width: usize) -> Vec<String> {
 }
 
 fn terminal_line(text: &str) -> String {
+    if is_hebrew(text) {
+        // Hebrew letters don't join, so no reshaping: only bidi reorder.
+        // Niqqud and cantillation are stripped like Arabic tashkil — terminals
+        // shape pointed Hebrew unreliably, and dotted circles read worse
+        // than clean consonantal text.
+        return text
+            .chars()
+            .filter(|character| !is_hebrew_combining_mark(*character))
+            .rev()
+            .collect();
+    }
     reshaper()
         .reshape(text)
         .chars()
@@ -66,9 +92,16 @@ fn terminal_line(text: &str) -> String {
         .collect()
 }
 
+fn is_hebrew(text: &str) -> bool {
+    text.chars()
+        .any(|character| matches!(character as u32, 0x0590..=0x05FF))
+}
+
 fn logical_width(text: &str) -> usize {
     text.chars()
-        .filter(|character| !is_arabic_combining_mark(*character))
+        .filter(|character| {
+            !is_arabic_combining_mark(*character) && !is_hebrew_combining_mark(*character)
+        })
         .count()
 }
 
@@ -88,6 +121,13 @@ fn is_arabic_combining_mark(character: char) -> bool {
             | 0x06E7..=0x06E8
             | 0x06EA..=0x06ED
             | 0x08D3..=0x08FF
+    )
+}
+
+fn is_hebrew_combining_mark(character: char) -> bool {
+    matches!(
+        character as u32,
+        0x0591..=0x05BD | 0x05BF | 0x05C1..=0x05C2 | 0x05C4..=0x05C5 | 0x05C7
     )
 }
 
@@ -117,5 +157,22 @@ mod tests {
     fn logical_mode_preserves_uthmani_marks() {
         let lines = terminal_lines("السَّلَامُ عَلَيْكُمْ", 40, RtlMode::Logical);
         assert!(lines[0].contains('َ'));
+    }
+
+    #[test]
+    fn hebrew_reorders_without_marks() {
+        // Genesis 1:1 pointed: niqqud + cantillation strip, order reverses.
+        let lines = terminal_lines("בְּרֵאשִׁ֖ית", 40, RtlMode::Visual);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "תישארב");
+        assert!(!lines[0]
+            .chars()
+            .any(|character| { matches!(character as u32, 0x0591..=0x05C7) }));
+    }
+
+    #[test]
+    fn greek_never_reverses() {
+        let lines = terminal_lines("Ἐν ἀρχῇ", 40, RtlMode::Visual);
+        assert_eq!(lines, ["Ἐν ἀρχῇ"]);
     }
 }

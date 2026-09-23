@@ -1,85 +1,56 @@
-use crate::data::get_data_dir;
+use crate::hadith;
 use chrono::{Datelike, Local};
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::time::Duration;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Hadith {
-    hadithnumber: u16,
-    text: String,
-    reference: HadithReference,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct HadithReference {
-    book: u16,
-    hadith: u16,
-}
-
-#[derive(Deserialize)]
-struct HadithResponse {
-    hadiths: Vec<Hadith>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct CachedHadith {
-    date: String,
-    hadith: Hadith,
-}
-
-pub fn run() -> Result<(), String> {
-    let today = Local::now();
-    let date = today.format("%Y-%m-%d").to_string();
-    let cache_path = get_data_dir().join("hadith_cache.json");
-
-    let hadith = fs::read_to_string(&cache_path)
-        .ok()
-        .and_then(|contents| serde_json::from_str::<CachedHadith>(&contents).ok())
-        .filter(|cached| cached.date == date)
-        .map(|cached| cached.hadith)
-        .map(Ok)
-        .unwrap_or_else(|| fetch_hadith(today.ordinal() as usize))?;
-
-    let cached = CachedHadith {
-        date,
-        hadith: hadith.clone(),
-    };
-    if let Ok(contents) = serde_json::to_string_pretty(&cached) {
-        let _ = fs::create_dir_all(get_data_dir());
-        let _ = fs::write(cache_path, contents);
+/// `qari hadith` alone prints the Bukhari hadith of the day; naming a book
+/// lists that book, or prints one hadith when a number is given.
+pub fn run(collection: Option<&str>, number: Option<u32>) -> Result<(), String> {
+    match collection {
+        Some(collection) => run_book(collection, number),
+        None => run_today(),
     }
+}
 
-    println!(
-        "Hadith of the Day — Sahih al-Bukhari #{}\n",
-        hadith.hadithnumber
-    );
-    println!("{}\n", hadith.text);
-    println!(
-        "Reference: Book {}, Hadith {}",
-        hadith.reference.book, hadith.reference.hadith
-    );
+/// Reads the same bulk cache the TUI shelf uses, so one store and one
+/// fetch path serve both the daily hadith and the hadith books.
+fn run_today() -> Result<(), String> {
+    let book = hadith::meta("bukhari").ok_or_else(|| "Unknown hadith book: bukhari".to_string())?;
+    let entries = hadith::load_entries(book.id)?;
+    let ordinal = Local::now().ordinal() as usize;
+    let entry = entries
+        .get(ordinal.saturating_sub(1) % entries.len().max(1))
+        .ok_or_else(|| format!("{} has no hadiths to show", book.label))?;
+    println!("Hadith of the Day — {} #{}\n", book.label, entry.number);
+    println!("{}", entry.english);
     Ok(())
 }
 
-fn fetch_hadith(ordinal: usize) -> Result<Hadith, String> {
-    let number = ordinal.saturating_sub(1) % 7563 + 1;
-    let url = format!(
-        "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari/{number}.json"
-    );
-    let response: HadithResponse = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .user_agent("qari-cli/0.1.0")
-        .build()
-        .map_err(|error| error.to_string())?
-        .get(url)
-        .send()
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .and_then(reqwest::blocking::Response::json)
-        .map_err(|error| format!("Could not fetch today's hadith: {error}"))?;
-    response
-        .hadiths
-        .into_iter()
-        .next()
-        .ok_or_else(|| "Hadith API returned no hadith".to_string())
+/// One hadith book: list all, or print one with Arabic and English.
+fn run_book(collection: &str, number: Option<u32>) -> Result<(), String> {
+    let id = collection.to_ascii_lowercase();
+    let book = hadith::meta(&id)
+        .ok_or_else(|| format!("Unknown hadith book: {collection} (try bukhari, muslim, abudawud, tirmidhi, nasai, ibnmajah, malik, nawawi)"))?;
+    let entries = hadith::load_entries(book.id)?;
+    if let Some(number) = number {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.number == number)
+            .ok_or_else(|| format!("{} {number} is not available", book.label))?;
+        println!("{} {}\n", book.label, entry.number);
+        println!(
+            "{}{}",
+            entry.arabic,
+            if entry.english.is_empty() {
+                String::new()
+            } else {
+                format!("\n\n{}", entry.english)
+            }
+        );
+        return Ok(());
+    }
+    println!("{} ({} hadith):\n", book.label, entries.len());
+    for entry in &entries {
+        let preview: String = entry.english.chars().take(72).collect();
+        println!("{:>4}. {preview}", entry.number);
+    }
+    Ok(())
 }

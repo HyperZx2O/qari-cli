@@ -1,15 +1,37 @@
 use crate::quran::{Ayah, Surah};
-use crate::surah_meta::SURAH_META;
 use serde::Deserialize;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const EDITIONS: [(&str, &str); 3] = [
+/// Shared by every network call in the app.
+const USER_AGENT: &str = "qari-cli/0.1.0";
+
+const EDITIONS: [(&str, &str); 2] = [
     ("quran-uthmani", "quran_ar.json"),
     ("en.sahih", "quran_en.json"),
-    ("bn.bengali", "quran_bn.json"),
+];
+
+/// Curated transliterated surah names in order. Revelation type comes from
+/// the downloaded edition and the ayah count from its served ayah list, so
+/// no second metadata table is needed.
+const SURAH_NAMES: [&str; 114] = [
+    "Al-Fatihah", "Al-Baqarah", "Ali 'Imran", "An-Nisa", "Al-Ma'idah", "Al-An'am", "Al-A'raf", "Al-Anfal",
+    "At-Tawbah", "Yunus", "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr", "An-Nahl",
+    "Al-Isra", "Al-Kahf", "Maryam", "Taha", "Al-Anbya", "Al-Hajj", "Al-Mu'minun", "An-Nur",
+    "Al-Furqan", "Ash-Shu'ara", "An-Naml", "Al-Qasas", "Al-'Ankabut", "Ar-Rum", "Luqman", "As-Sajdah",
+    "Al-Ahzab", "Saba", "Fatir", "Ya-Sin", "As-Saffat", "Sad", "Az-Zumar", "Ghafir",
+    "Fussilat", "Ash-Shuraa", "Az-Zukhruf", "Ad-Dukhan", "Al-Jathiyah", "Al-Ahqaf", "Muhammad", "Al-Fath",
+    "Al-Hujurat", "Qaf", "Adh-Dhariyat", "At-Tur", "An-Najm", "Al-Qamar", "Ar-Rahman", "Al-Waqi'ah",
+    "Al-Hadid", "Al-Mujadila", "Al-Hashr", "Al-Mumtahanah", "As-Saf", "Al-Jumu'ah", "Al-Munafiqun", "At-Taghabun",
+    "At-Talaq", "At-Tahrim", "Al-Mulk", "Al-Qalam", "Al-Haqqah", "Al-Ma'arij", "Nuh", "Al-Jinn",
+    "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyamah", "Al-Insan", "Al-Mursalat", "An-Naba", "An-Nazi'at", "'Abasa",
+    "At-Takwir", "Al-Infitar", "Al-Mutaffifin", "Al-Inshiqaq", "Al-Buruj", "At-Tariq", "Al-A'la", "Al-Ghashiyah",
+    "Al-Fajr", "Al-Balad", "Ash-Shams", "Al-Layl", "Ad-Duhaa", "Ash-Sharh", "At-Tin", "Al-'Alaq",
+    "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-'Adiyat", "Al-Qari'ah", "At-Takathur", "Al-'Asr", "Al-Humazah",
+    "Al-Fil", "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr", "Al-Masad", "Al-Ikhlas",
+    "Al-Falaq", "An-Nas",
 ];
 
 #[derive(Debug, Deserialize)]
@@ -26,6 +48,9 @@ struct ApiQuran {
 #[derive(Debug, Deserialize)]
 struct ApiSurah {
     number: u8,
+    /// Served as `"Meccan"` / `"Medinan"`.
+    #[serde(rename = "revelationType")]
+    revelation_type: String,
     ayahs: Vec<ApiAyah>,
 }
 
@@ -35,7 +60,6 @@ struct ApiAyah {
     #[serde(rename = "numberInSurah")]
     number_in_surah: u16,
     juz: u8,
-    page: u16,
 }
 
 pub fn get_data_dir() -> PathBuf {
@@ -58,7 +82,28 @@ pub fn ensure_data_dir() -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn load_quran(show_progress: bool) -> Result<Vec<Surah>, Box<dyn Error>> {
+/// One HTTP GET for the whole app: shared user agent, per-call timeout,
+/// optional query parameters, and one `{what} request failed` error shape.
+pub(crate) fn http_get(
+    what: &str,
+    url: &str,
+    query: &[(&str, &str)],
+    timeout_secs: u64,
+) -> Result<String, String> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(timeout_secs))
+        .user_agent(USER_AGENT)
+        .build()
+        .map_err(|error| error.to_string())?
+        .get(url)
+        .query(query)
+        .send()
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .and_then(|response| response.text())
+        .map_err(|error| format!("{what} request failed: {error}"))
+}
+
+pub fn load_quran() -> Result<Vec<Surah>, Box<dyn Error>> {
     let data_dir = get_data_dir();
     let all_cached = EDITIONS
         .iter()
@@ -67,49 +112,30 @@ pub fn load_quran(show_progress: bool) -> Result<Vec<Surah>, Box<dyn Error>> {
     if all_cached {
         match load_from_cache(&data_dir) {
             Ok(surahs) => return Ok(surahs),
-            Err(error) => {
-                if show_progress {
-                    eprintln!("Cached Quran data is invalid ({error}); downloading it again...");
-                }
-                remove_cache(&data_dir);
-            }
+            Err(_) => remove_cache(&data_dir),
         }
     } else {
         remove_cache(&data_dir);
     }
 
-    fetch_and_cache(show_progress)
+    fetch_and_cache()
 }
 
 fn load_from_cache(data_dir: &Path) -> Result<Vec<Surah>, Box<dyn Error>> {
     let ar = parse_edition(&fs::read_to_string(data_dir.join("quran_ar.json"))?)?;
     let en = parse_edition(&fs::read_to_string(data_dir.join("quran_en.json"))?)?;
-    let bn = parse_edition(&fs::read_to_string(data_dir.join("quran_bn.json"))?)?;
-    merge_editions(ar, en, bn)
+    merge_editions(ar, en)
 }
 
-fn fetch_and_cache(show_progress: bool) -> Result<Vec<Surah>, Box<dyn Error>> {
-    if show_progress {
-        eprintln!("Fetching Quran data (first run)...");
-    }
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(90))
-        .user_agent("qari-cli/0.1.0")
-        .build()?;
-
+fn fetch_and_cache() -> Result<Vec<Surah>, Box<dyn Error>> {
     let mut raw_editions = Vec::with_capacity(EDITIONS.len());
     for (edition, _) in EDITIONS {
-        if show_progress {
-            eprintln!("  Downloading {edition}...");
-        }
-        raw_editions.push(fetch_edition(&client, edition)?);
+        raw_editions.push(fetch_edition(edition)?);
     }
 
     let ar = parse_edition(&raw_editions[0])?;
     let en = parse_edition(&raw_editions[1])?;
-    let bn = parse_edition(&raw_editions[2])?;
-    let surahs = merge_editions(ar, en, bn)?;
+    let surahs = merge_editions(ar, en)?;
 
     let data_dir = get_data_dir();
     fs::create_dir_all(&data_dir)?;
@@ -117,18 +143,12 @@ fn fetch_and_cache(show_progress: bool) -> Result<Vec<Surah>, Box<dyn Error>> {
         write_atomic(&data_dir.join(file_name), contents)?;
     }
 
-    if show_progress {
-        eprintln!("Quran data cached for offline use.");
-    }
     Ok(surahs)
 }
 
-fn fetch_edition(
-    client: &reqwest::blocking::Client,
-    edition: &str,
-) -> Result<String, Box<dyn Error>> {
+fn fetch_edition(edition: &str) -> Result<String, Box<dyn Error>> {
     let url = format!("https://api.alquran.cloud/v1/quran/{edition}");
-    Ok(client.get(url).send()?.error_for_status()?.text()?)
+    Ok(http_get("Quran", &url, &[], 90)?)
 }
 
 fn parse_edition(contents: &str) -> Result<ApiQuran, Box<dyn Error>> {
@@ -139,38 +159,30 @@ fn parse_edition(contents: &str) -> Result<ApiQuran, Box<dyn Error>> {
     Ok(response.data)
 }
 
-fn merge_editions(ar: ApiQuran, en: ApiQuran, bn: ApiQuran) -> Result<Vec<Surah>, Box<dyn Error>> {
-    if ar.surahs.len() != 114 || en.surahs.len() != 114 || bn.surahs.len() != 114 {
+fn merge_editions(ar: ApiQuran, en: ApiQuran) -> Result<Vec<Surah>, Box<dyn Error>> {
+    if ar.surahs.len() != 114 || en.surahs.len() != 114 {
         return Err("an edition does not contain all 114 surahs".into());
     }
 
     let mut merged = Vec::with_capacity(114);
-    for ((ar_surah, en_surah), bn_surah) in ar.surahs.into_iter().zip(en.surahs).zip(bn.surahs) {
-        if ar_surah.number != en_surah.number || ar_surah.number != bn_surah.number {
+    for (ar_surah, en_surah) in ar.surahs.into_iter().zip(en.surahs) {
+        if ar_surah.number != en_surah.number {
             return Err(format!("edition mismatch at surah {}", ar_surah.number).into());
         }
 
-        let meta = SURAH_META
+        let name = SURAH_NAMES
             .get(ar_surah.number.saturating_sub(1) as usize)
             .ok_or_else(|| format!("unknown surah number {}", ar_surah.number))?;
 
-        if ar_surah.ayahs.len() != meta.ayah_count as usize
-            || en_surah.ayahs.len() != ar_surah.ayahs.len()
-            || bn_surah.ayahs.len() != ar_surah.ayahs.len()
-        {
+        if en_surah.ayahs.len() != ar_surah.ayahs.len() {
             return Err(format!("edition ayah count mismatch in surah {}", ar_surah.number).into());
         }
+        // The endpoint ships no per-surah ayah count: the served list is it.
+        let ayah_count = ar_surah.ayahs.len() as u16;
 
         let mut ayahs = Vec::with_capacity(ar_surah.ayahs.len());
-        for ((arabic, english), bengali) in ar_surah
-            .ayahs
-            .into_iter()
-            .zip(en_surah.ayahs)
-            .zip(bn_surah.ayahs)
-        {
-            if arabic.number_in_surah != english.number_in_surah
-                || arabic.number_in_surah != bengali.number_in_surah
-            {
+        for (arabic, english) in ar_surah.ayahs.into_iter().zip(en_surah.ayahs) {
+            if arabic.number_in_surah != english.number_in_surah {
                 return Err(format!(
                     "edition mismatch at {}:{}",
                     ar_surah.number, arabic.number_in_surah
@@ -181,20 +193,15 @@ fn merge_editions(ar: ApiQuran, en: ApiQuran, bn: ApiQuran) -> Result<Vec<Surah>
                 number: arabic.number_in_surah,
                 arabic: arabic.text.trim_start_matches('\u{feff}').to_string(),
                 english: english.text,
-                bengali: bengali.text,
                 juz: arabic.juz,
-                page: arabic.page,
             });
         }
 
         merged.push(Surah {
-            number: meta.number,
-            name_arabic: meta.name_arabic.to_string(),
-            name_transliterated: meta.name_transliterated.to_string(),
-            name_meaning: meta.name_meaning.to_string(),
-            is_meccan: meta.is_meccan,
-            revelation_order: meta.revelation_order,
-            ayah_count: meta.ayah_count,
+            number: ar_surah.number,
+            name_transliterated: (*name).to_string(),
+            is_meccan: ar_surah.revelation_type.eq_ignore_ascii_case("Meccan"),
+            ayah_count,
             ayahs,
         });
     }
@@ -206,7 +213,7 @@ fn merge_editions(ar: ApiQuran, en: ApiQuran, bn: ApiQuran) -> Result<Vec<Surah>
     Ok(merged)
 }
 
-fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
+pub(crate) fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
     let temporary = path.with_extension("json.tmp");
     fs::write(&temporary, contents)?;
     if path.exists() {
@@ -240,9 +247,19 @@ mod tests {
                 .unwrap();
             assert_eq!(surah.ayahs.len(), available_ayahs);
         }
-        assert!(fallback
+        let kursi = fallback
             .iter()
             .find(|surah| surah.number == 2)
-            .is_some_and(|surah| surah.ayahs.iter().any(|ayah| ayah.number == 255)));
+            .and_then(|surah| surah.ayahs.iter().find(|ayah| ayah.number == 255))
+            .expect("Al-Baqarah 255 is bundled");
+        assert!(kursi.english.contains("no deity except Him"));
+        assert!(!kursi.arabic.is_empty());
+    }
+
+    #[test]
+    fn surah_names_cover_every_surah_in_order() {
+        assert_eq!(SURAH_NAMES.len(), 114);
+        assert_eq!(SURAH_NAMES[0], "Al-Fatihah");
+        assert_eq!(SURAH_NAMES[113], "An-Nas");
     }
 }

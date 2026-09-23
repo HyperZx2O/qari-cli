@@ -21,21 +21,26 @@ pub struct PrayerTimes {
     pub isha: PrayerTime,
 }
 
-pub fn calculate_prayer_times(latitude: f64, longitude: f64, method: u8) -> PrayerTimes {
-    calculate_for_date(Local::now().date_naive(), latitude, longitude, method)
+impl PrayerTimes {
+    /// `(name, "HH:MM")` rows in display order.
+    pub fn rows(&self) -> [(&'static str, String); 5] {
+        [
+            ("Fajr", self.fajr.to_string()),
+            ("Dhuhr", self.dhuhr.to_string()),
+            ("Asr", self.asr.to_string()),
+            ("Maghrib", self.maghrib.to_string()),
+            ("Isha", self.isha.to_string()),
+        ]
+    }
 }
 
-pub fn calculate_for_date(
-    date: NaiveDate,
-    latitude: f64,
-    longitude: f64,
-    method: u8,
-) -> PrayerTimes {
-    let (fajr_angle, isha_angle) = match method {
-        1 => (18.0, 17.0), // Muslim World League
-        2 => (15.0, 15.0), // ISNA
-        _ => (18.0, 18.0), // Karachi
-    };
+pub fn calculate_prayer_times(latitude: f64, longitude: f64) -> PrayerTimes {
+    calculate_for_date(Local::now().date_naive(), latitude, longitude)
+}
+
+/// Karachi convention (18°/18°), the app's default angles.
+pub fn calculate_for_date(date: NaiveDate, latitude: f64, longitude: f64) -> PrayerTimes {
+    let (fajr_angle, isha_angle) = (18.0, 18.0);
     let julian = julian_date(date.year(), date.month(), date.day()) - longitude / 360.0;
     let timezone = (longitude / 15.0).round();
 
@@ -150,10 +155,13 @@ fn to_time(value: f64) -> PrayerTime {
 }
 
 fn fix_angle(value: f64) -> f64 {
-    ((value % 360.0) + 360.0) % 360.0
+    wrap_circle(value, 360.0)
 }
 fn fix_hour(value: f64) -> f64 {
-    ((value % 24.0) + 24.0) % 24.0
+    wrap_circle(value, 24.0)
+}
+fn wrap_circle(value: f64, modulus: f64) -> f64 {
+    ((value % modulus) + modulus) % modulus
 }
 fn sin_deg(value: f64) -> f64 {
     value.to_radians().sin()
@@ -175,4 +183,32 @@ fn atan2_deg(y: f64, x: f64) -> f64 {
 }
 fn acot_deg(value: f64) -> f64 {
     (1.0 / value).atan().to_degrees()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dhaka_prayer_times_land_in_plausible_hours() {
+        let date = NaiveDate::from_ymd_opt(2026, 9, 18).unwrap();
+        let times = calculate_for_date(date, 23.8103, 90.4125);
+        assert!((4..=6).contains(&times.fajr.hour));
+        assert!((17..=19).contains(&times.maghrib.hour));
+    }
+
+    #[test]
+    fn hijri_date_is_plausible() {
+        let date = NaiveDate::from_ymd_opt(2026, 9, 18).unwrap();
+        assert_eq!(hijri_date(date), (1448, 4, 7));
+    }
+
+    #[test]
+    fn rows_are_zero_padded_and_ordered() {
+        let date = NaiveDate::from_ymd_opt(2026, 9, 18).unwrap();
+        let rows = calculate_for_date(date, 23.8103, 90.4125).rows();
+        assert_eq!(rows[0].0, "Fajr");
+        assert_eq!(rows[4].0, "Isha");
+        assert!(rows.iter().all(|(_, time)| time.len() == 5));
+    }
 }

@@ -5,28 +5,50 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
 use std::time::{Duration, Instant};
+use unicode_width::UnicodeWidthStr;
 
+// Hallmark pre-flight (terminal adaptation):
+// - Tokens: ThemeColors only (theme.rs) — no hardcoded colors below.
+// - Type: terminal monospace only. Art is pure ASCII + single-line box
+//   drawing; never BOLD (faux-bold overstrikes block glyphs in VS Code /
+//   Windows Terminal and ghosts the logo).
+// - Motion: one authored moment (mark -> wordmark -> typed tagline),
+//   first-launch only, any-key skip, reduced_motion bypass.
+// Impeccable mode: Onboard (first-run loading flow).
+
+/// Open Quran resting on a rehal stand, pure ASCII (no box drawing, so it
+/// survives every terminal font and codepage). Rows use relative indents
+/// only (widest rows start at column 0); `render_art` centers the whole
+/// block, so editors stripping trailing whitespace can never break the
+/// symmetry. Verse lines vary in length like real ayahs.
 const MARK_ART: &[&str] = &[
-    "              ╭──────╮              ",
-    "          ╭───╯      ╰───╮          ",
-    "       ╭──╯   ╭────────╮  ╰──╮       ",
-    "       │     ╱          ╲    │       ",
-    "       │    ╱   ╲    ╱   ╲   │       ",
-    "       │   ╱     ╲  ╱     ╲  │       ",
-    "       ╰──╯       ╲╱       ╰──╯       ",
-    "                   ◆                 ",
+    "   ______       ______   ",
+    "  | ~~~~    |    ~~~~ |  ",
+    "  | ~~~~~   |   ~~~~~ |  ",
+    "  | ~~~     |     ~~~ |  ",
+    "  _____________________  ",
+    "        \\       /        ",
+    "          \\   /          ",
+    "            X            ",
+    "          /   \\          ",
 ];
 
+/// "QARI" wordmark in FIGlet Standard (pure ASCII, generated with
+/// `figlet QARI` — never hand-drawn). Standard is the most portable splash
+/// font: no block or double-line glyphs, so it survives faux-bold,
+/// narrow fonts, and legacy codepages. Rows are padded to equal width
+/// at render time.
 const TITLE_ART: &[&str] = &[
-    " ██████╗  █████╗ ██████╗ ██╗",
-    "██╔═══██╗██╔══██╗██╔══██╗██║",
-    "██║   ██║███████║██████╔╝██║",
-    "██║▄▄ ██║██╔══██║██╔══██╗██║",
-    "╚██████╔╝██║  ██║██║  ██║██║",
-    " ╚══▀▀═╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝",
+    " ___      _    ____  ___ ",
+    " / _ \\    / \\  |  _ \\|_ _|",
+    " | | | |  / _ \\ | |_) || | ",
+    " | |_| | / ___ \\|  _ < | | ",
+    "  \\__\\_\\/_/   \\_\\_| \\_\\___|",
 ];
 
-const INTRO_END_TICK: u32 = 175;
+const INTRO_END_TICK: u32 = 150;
+
+const TAGLINE: &str = "Ilm at your fingertips";
 
 pub struct IntroState {
     tick: u32,
@@ -61,9 +83,9 @@ impl IntroState {
 
     fn phase(&self) -> u8 {
         match self.tick {
-            0..=50 => 0,
-            51..=95 => 1,
-            96..=140 => 2,
+            0..=30 => 0,
+            31..=65 => 1,
+            66..=115 => 2,
             _ => 3,
         }
     }
@@ -80,7 +102,7 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
         area,
     );
 
-    if !state.animated || area.width < 58 || area.height < 20 {
+    if !state.animated || area.width < 58 || area.height < 21 {
         render_compact(frame, area, state, colors, data_ready);
         return;
     }
@@ -88,12 +110,12 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
     let [vertical] = Layout::vertical([Constraint::Length(19)])
         .flex(Flex::Center)
         .areas(area);
-    let [content] = Layout::horizontal([Constraint::Length(48)])
+    let [content] = Layout::horizontal([Constraint::Length(40)])
         .flex(Flex::Center)
         .areas(vertical);
     let [mark_area, title_area, tagline_area, loading_area, hint_area] = Layout::vertical([
-        Constraint::Length(8),
-        Constraint::Length(6),
+        Constraint::Length(9),
+        Constraint::Length(5),
         Constraint::Length(2),
         Constraint::Length(2),
         Constraint::Length(1),
@@ -102,7 +124,7 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
     let phase = state.phase();
 
     let mark_progress = if phase == 0 {
-        state.tick as f32 / 50.0
+        state.tick as f32 / 30.0
     } else {
         1.0
     };
@@ -111,12 +133,11 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
         mark_area,
         MARK_ART,
         interpolate(colors.background, colors.accent, mark_progress.min(1.0)),
-        false,
     );
 
     if phase >= 1 {
         let title_progress = if phase == 1 {
-            (state.tick.saturating_sub(51)) as f32 / 44.0
+            (state.tick.saturating_sub(31)) as f32 / 34.0
         } else {
             1.0
         };
@@ -129,20 +150,19 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
                 colors.foreground,
                 title_progress.min(1.0),
             ),
-            true,
         );
     }
 
     if phase >= 2 {
-        let tagline = "The Quran at your fingertips";
+        let total = TAGLINE.chars().count();
         let visible = if phase == 2 {
-            state.tick.saturating_sub(96) as usize * tagline.chars().count() / 44
+            (state.tick.saturating_sub(66) as usize * total / 50).min(total)
         } else {
-            tagline.chars().count()
+            total
         };
         frame.render_widget(
-            Paragraph::new(tagline.chars().take(visible).collect::<String>())
-                .alignment(Alignment::Left)
+            Paragraph::new(TAGLINE.chars().take(visible).collect::<String>())
+                .alignment(Alignment::Center)
                 .style(Style::default().fg(colors.muted)),
             tagline_area,
         );
@@ -151,7 +171,7 @@ pub fn render(frame: &mut Frame, state: &IntroState, colors: &ThemeColors, data_
     render_loading(frame, loading_area, state, colors, data_ready);
     frame.render_widget(
         Paragraph::new("Press any key to skip")
-            .alignment(Alignment::Right)
+            .alignment(Alignment::Center)
             .style(Style::default().fg(colors.muted)),
         hint_area,
     );
@@ -183,13 +203,31 @@ fn render_compact(
     frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), content);
 }
 
-fn render_art(frame: &mut Frame, area: Rect, art: &[&str], color: Color, bold: bool) {
-    let mut style = Style::default().fg(color);
-    if bold {
-        style = style.add_modifier(Modifier::BOLD);
-    }
-    let lines: Vec<Line> = art.iter().map(|line| Line::styled(*line, style)).collect();
-    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), area);
+/// Center the art BLOCK in the area (not each line on its own), keeping
+/// rows mutually aligned by construction: source rows carry relative
+/// indents, trailing whitespace is trimmed, rows are right-padded to the
+/// block width, and the whole block is offset to the center. Plain
+/// (non-bold) style: faux-bold would overstrike the glyphs.
+fn render_art(frame: &mut Frame, area: Rect, art: &[&str], color: Color) {
+    let style = Style::default().fg(color);
+    let block_width = art
+        .iter()
+        .map(|line| line.trim_end().width())
+        .max()
+        .unwrap_or(0);
+    let block_pad = (area.width as usize).saturating_sub(block_width) / 2;
+    let lines: Vec<Line> = art
+        .iter()
+        .map(|line| {
+            let content = line.trim_end();
+            let right = block_width.saturating_sub(content.width());
+            Line::styled(
+                format!("{}{content}{}", " ".repeat(block_pad), " ".repeat(right)),
+                style,
+            )
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Left), area);
 }
 
 fn render_loading(
@@ -200,22 +238,22 @@ fn render_loading(
     data_ready: bool,
 ) {
     frame.render_widget(
-        Paragraph::new(loading_line(state.tick, colors, data_ready)).alignment(Alignment::Left),
+        Paragraph::new(loading_line(state.tick, colors, data_ready)).alignment(Alignment::Center),
         area,
     );
 }
 
 fn loading_line(tick: u32, colors: &ThemeColors, data_ready: bool) -> Line<'static> {
-    let frames = ["◐", "◓", "◑", "◒"];
+    let frames = ["|", "/", "—", "\\"];
     let icon = if data_ready {
         "◆"
     } else {
         frames[(tick as usize / 8) % frames.len()]
     };
     let message = if data_ready {
-        " Quran ready"
+        " Ilm ready"
     } else {
-        " Preparing Quran…"
+        " Preparing Ilm…"
     };
     Line::from(vec![
         Span::styled(icon.to_string(), Style::default().fg(colors.accent)),
@@ -266,6 +304,40 @@ mod tests {
     }
 
     #[test]
+    fn mark_art_rows_share_one_center() {
+        // Every row's content must be centered on the same column:
+        // 2 * indent + content_width is constant across rows. This holds
+        // even when rows have different widths or trailing spaces are
+        // stripped, which is exactly what broke the old logo.
+        let centers: Vec<usize> = MARK_ART
+            .iter()
+            .map(|line| {
+                let trimmed = line.trim_end();
+                let indent = trimmed.chars().take_while(|c| *c == ' ').count();
+                indent * 2 + trimmed.trim_start().width()
+            })
+            .collect();
+        for (index, center) in centers.iter().enumerate() {
+            assert_eq!(
+                *center, centers[0],
+                "mark row {index} off-center: {:?}",
+                MARK_ART[index]
+            );
+        }
+    }
+
+    #[test]
+    fn title_art_fits_content_column() {
+        let max = TITLE_ART
+            .iter()
+            .map(|line| line.trim_end().width())
+            .max()
+            .unwrap();
+        assert!(max <= 38, "title too wide for the 40-col content: {max}");
+        assert!(max >= 20, "title looks truncated: {max}");
+    }
+
+    #[test]
     fn compact_intro_renders_on_small_terminals() {
         let mut terminal = Terminal::new(TestBackend::new(40, 10)).unwrap();
         let state = IntroState::new(true);
@@ -280,14 +352,14 @@ mod tests {
             .map(|cell| cell.symbol())
             .collect::<String>();
         assert!(output.contains("qari-cli"));
-        assert!(output.contains("Preparing Quran"));
+        assert!(output.contains("Preparing Ilm"));
     }
 
     #[test]
-    fn full_intro_renders_title_and_tagline() {
+    fn tagline_types_out_before_completion() {
         let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
         let mut state = IntroState::new(true);
-        state.tick = 150;
+        state.tick = 80;
         terminal
             .draw(|frame| render(frame, &state, &Theme::Dark.colors(), true))
             .unwrap();
@@ -298,8 +370,27 @@ mod tests {
             .iter()
             .map(|cell| cell.symbol())
             .collect::<String>();
-        assert!(output.contains("██████"));
-        assert!(output.contains("The Quran at your fingertips"));
-        assert!(output.contains("Quran ready"));
+        assert!(output.contains("Ilm at"));
+        assert!(!output.contains("fingertips"));
+    }
+
+    #[test]
+    fn full_intro_renders_title_and_tagline() {
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        let mut state = IntroState::new(true);
+        state.tick = INTRO_END_TICK;
+        terminal
+            .draw(|frame| render(frame, &state, &Theme::Dark.colors(), true))
+            .unwrap();
+        let output = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(output.contains("| |_| |"));
+        assert!(output.contains("Ilm at your fingertips"));
+        assert!(output.contains("Ilm ready"));
     }
 }
