@@ -4,6 +4,8 @@ A terminal scripture library: fourteen shelves — six revelations plus eight ha
 
 No commentary, no audio, no web or mobile UI. Primary texts with English where a translation exists, and an honest marker where one does not.
 
+![qari-cli demo: library tour, verse focus, search, themes, and CLI](assets/demo.gif)
+
 ## Install
 
 ```sh
