@@ -4,6 +4,15 @@
   "description": "Read the Quran in your terminal",
   "bin": { "qari": "./install.js" },
   "scripts": { "postinstall": "node install.js" },
+  "files": ["install.js", "package.json", "README.md", "LICENSE"],
+  "preferGlobal": true,
+  "engines": { "node": ">=18" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HyperZx2O/qari-cli.git"
+  },
+  "homepage": "https://github.com/HyperZx2O/qari-cli#readme",
+  "bugs": { "url": "https://github.com/HyperZx2O/qari-cli/issues" },
   "keywords": ["quran", "islam", "cli", "terminal", "tui"],
   "license": "MIT"
 }

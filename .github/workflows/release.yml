@@ -26,8 +26,14 @@ jobs:
             target: aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
+      - name: Sync Cargo version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: sed -i 's/^version = ".*"/version = "'"${GITHUB_REF_NAME#v}"'"/' Cargo.toml
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -86,6 +92,16 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: npm
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+      - name: Stage npm files
+        run: cp README.md LICENSE npm/
+      - name: Check package contents
+        working-directory: npm
+        run: npm pack --dry-run
+      - name: Smoke-test installer (node + bun)
+        working-directory: npm
+        run: |
+          node --check install.js
+          node -e "require('./package.json')"
       - name: Publish
         working-directory: npm
         run: npm publish

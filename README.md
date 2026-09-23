@@ -1,11 +1,20 @@
 # qari-cli
 
-A full-screen Quran reader for the terminal, with Arabic, Sahih International English, and Muhiuddin Khan Bengali text.
+A terminal scripture library: fourteen shelves — six revelations plus eight hadith books — in one static Rust binary. A three-column TUI for reading, and a pipe-friendly CLI for everything else.
+
+No commentary, no audio, no web or mobile UI. Primary texts with English where a translation exists, and an honest marker where one does not.
 
 ## Install
 
 ```sh
 npm install -g qari-cli
+```
+
+Works with Bun too:
+
+```sh
+bun add -g qari-cli
+bunx qari-cli today
 ```
 
 Or on Linux/macOS:
@@ -14,59 +23,112 @@ Or on Linux/macOS:
 curl -fsSL https://raw.githubusercontent.com/HyperZx2O/qari-cli/main/install.sh | bash
 ```
 
-On first use, the application downloads and caches all three Quran editions. A small bundled selection remains available if that download fails.
+Prebuilt binaries for Windows, macOS, and Linux (including Windows ARM64) are attached to every GitHub release.
+
+On first use, the app downloads what it needs and caches it on disk: both Quran editions plus any Alkotob chapter or hadith book you open. A small bundled Quran selection keeps the reader usable if a download fails.
+
+## The library
+
+The TUI is one continuous three-column shelf — no mode key:
+
+1. **Books** — the fourteen shelves: Quran, Tawrat, Zabur, Injil, Tanakh, Greek NT, then Sahih Bukhari, Sahih Muslim, Abu Dawud, Tirmidhi, Nasa'i, Ibn Majah, Muwatta Malik, Nawawi 40.
+2. **Units** — the open book's readings, flattened one level deep: surahs, `Genesis 1 … Deuteronomy 34`, `Psalm 1 … 150`, `Hadith 1 … 7563`.
+3. **Text** — the whole unit as one scroll, with a verse cursor that `j`/`k` moves verse to verse. The cursor verse is marked with `▶`; the pane follows it.
+
+Selecting a row in columns 1 and 2 opens it immediately — `Enter` only moves focus.
+
+## Collections and languages
+
+| Shelf | Source | Text | English |
+|---|---|---|---|
+| Quran | alquran.cloud (Uthmani) | Arabic | Sahih International, always |
+| Tawrat | Alkotob `tawrat` (5 books) | Arabic | — |
+| Zabur | Alkotob `zabur` (150 psalms) | Arabic | — |
+| Injil | Alkotob `injil` (27 books) | Arabic | `injilen` for the Gospels + Acts; `(AR)` elsewhere |
+| Tanakh | Alkotob `wlc` (39 books) | Hebrew | — |
+| Greek NT | Alkotob `gnt` (27 books) | Greek | — |
+| 8 hadith books | fawazahmed0 bulk editions | Arabic | English per book where translated |
+
+Press `v` to cycle the open shelf's languages (Tawrat and Zabur stay Arabic; Tanakh stays Hebrew; Greek stays Greek). Verses with no translation show `(AR)` instead of a gap — in the text, in search, and in the focus view. A chapter first opened in Arabic picks up its English automatically once you toggle. Quran transliteration rides along on `i`, and Juz navigation on `J`.
 
 ## Usage
 
 ```sh
-qari                         # interactive TUI
+qari                         # interactive TUI (Quran by default)
 qari intro                   # replay the startup animation
-qari --intro                 # force the animation before reading
 qari --no-intro              # skip the animation
-qari read 2:255              # specific ayah
+qari read 2:255              # one Quran ayah
 qari read "Al-Baqarah"       # full surah
-qari search mercy            # top fuzzy matches
-qari random                  # random ayah
+qari read "tawrat gen 1:3"   # Tawrat verse (or "Genesis 1")
+qari read zabur 23           # whole psalm (or "zabur 23:5")
+qari read "injil joh 3:16"   # Injil verse
+qari read "bukhari 402"      # one hadith by number
+qari search mercy            # top fuzzy matches (Quran)
+qari search --collection tawrat "النور"  # cached chapters only
+qari search --collection bukhari "صلاة"
+qari random                  # random ayah (or: random bukhari)
 qari today                   # deterministic ayah of the day
 qari pray                    # configured coordinates
 qari pray --city Dhaka --country BD
-qari hadith                  # Sahih al-Bukhari hadith of the day
+qari hadith                  # Bukhari hadith of the day
+qari hadith bukhari          # list one hadith book (muslim, abudawud,
+qari hadith bukhari 5        #   tirmidhi, nasai, ibnmajah, malik, nawawi)
+qari books                   # shelves and Alkotob editions
+qari books tawrat            # books of one revelation
+qari books --edition tawrat --book gen --chapter 1
 ```
 
-Subcommand output contains no ANSI escapes when piped.
+Search covers the open shelf's downloaded chapters only — it never touches the network.CLI output contains no ANSI escapes when piped. Each hadith book downloads its Arabic and English bulk once (several MB on first open) and reads offline after that.
 
 ## Interactive keys
 
 | Key | Action |
 |---|---|
-| `h`/`l`, `←`/`→` | Switch panel |
-| `j`/`k`, `↓`/`↑` | Navigate lists or scroll Scripture/help |
+| `h`/`l`, `←`/`→` | Move between Books, Units, Text columns |
+| `j`/`k`, `↓`/`↑` | Navigate the active column (verse cursor in Text) |
 | `/` | Live search |
-| `Enter` | Select result/panel |
-| `y` or `c` | Copy ayah |
+| `Enter` | Move into the next column |
+| `y` or `c` | Copy verse |
 | `b` | Toggle bookmark |
 | `t` | Cycle theme |
-| `v` | Cycle EN/BN/AR |
+| `v` | Cycle language (per collection) |
+| `f` | Verse focus: transliteration plus highlighted translation |
+| `i` | Transliteration (Quran) |
+| `J` | Juz navigation (Quran) |
 | `?` | Help |
 | `qq` | Quit |
 | `Ctrl+C` | Quit immediately |
+| `Ctrl+L` | Redraw screen |
 
 ## Features
 
-- Three-panel Surah, Ayah, and Scripture browser
-- Animated first-launch intro while Quran data loads
-- Arabic, English, and Bengali text cached for offline use
-- Live fuzzy search, three themes, bookmarks, and session persistence
+- Three-column library: Books, Units, and full-unit text with a marked verse cursor
+- Verse focus modal (`f`) with transliteration and highlighted translation
+- Six revelations plus eight hadith books, one shelf each
+- Live fuzzy search over downloaded text, three themes, string-key bookmarks with legacy migration, session persistence
+- Animated first-launch intro while Quran data loads in the background
+- Offline-first disk cache with bundled fallback; honest `(AR)` markers, never silent gaps
 - Prayer times with Karachi/Hanafi defaults and optional city lookup
-- Pipe-friendly read, search, random, today, prayer, and hadith commands
+- Pipe-friendly `read`, `search`, `random`, `today`, `pray`, `hadith`, and `books` commands
 
-Unicode-capable terminals such as Windows Terminal, iTerm2, Kitty, Alacritty, and GNOME Terminal are supported. Arabic/Bengali glyph quality depends on installed fonts and terminal shaping support.
+## Data and offline behavior
 
-The full-screen TUI shapes Arabic into terminal-safe visual order and omits combining recitation marks so terminal cursor positions remain stable. Plain CLI output and copied ayahs retain the original Uthmani text with all marks.
+Runtime data lives outside the repo in the platform data directory (`%LOCALAPPDATA%\qari-cli\` on Windows): Alkotob chapters cached per file as you open them, hadith bulks per book and language, bookmarks, and the Quran editions. Deleting that directory resets to freshly-downloaded state; the bundled fallback covers the gap if the network is down.
 
-Configuration is stored in `~/.config/qari-cli/config.toml` (or the platform-equivalent config directory). Set `reduced_motion = true` to disable the animated intro. Arabic rendering defaults to `rtl_mode = "auto"`; use `"logical"` for terminals with native BiDi support or `"visual"` for traditional LTR terminal grids. `QARI_RTL_MODE` can override this per launch.
+## Configuration
 
-Built with Rust, Ratatui, Crossterm, alquran.cloud, AlAdhan, and the fawazahmed0 hadith dataset.
+Settings live in `~/.config/qari-cli/config.toml` (or the platform-equivalent config directory): language, theme, transliteration, last position, bookmarks, and prayer coordinates. Notable flags:
+
+- `reduced_motion = true` disables the animated intro.
+- `rtl_mode = "auto"` shapes Arabic for the terminal; use `"logical"` on terminals with native BiDi support or `"visual"` for traditional LTR terminal grids.
+
+## Terminals and fonts
+
+Any Unicode-capable terminal works — Windows Terminal, iTerm2, Kitty, Alacritty, GNOME Terminal. Arabic glyph quality depends on installed fonts and terminal shaping support. The fullscreen TUI shapes Arabic into terminal-safe visual order so cursor positions stay stable; plain CLI output and copied verses keep the original Uthmani text with all marks. The interface is fully keyboard-operable.
+
+## Built with
+
+Rust, Ratatui, Crossterm, alquran.cloud, the Alkotob API, AlAdhan, and the fawazahmed0 hadith dataset.
 
 ## License
 

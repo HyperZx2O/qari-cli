@@ -18,7 +18,10 @@ case "$OS" in
   *) echo "Unsupported OS: $OS"; exit 1 ;;
 esac
 
-LATEST=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -1)
+LATEST="${1:-${VERSION:-}}"
+if [ -z "$LATEST" ]; then
+  LATEST=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -1)
+fi
 URL="https://github.com/${REPO}/releases/download/${LATEST}/qari-${TARGET}.tar.gz"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
