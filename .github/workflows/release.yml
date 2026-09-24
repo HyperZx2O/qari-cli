@@ -22,7 +22,7 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --version 0.22.2 --locked
       - name: Audit Rust dependencies
-        run: cargo audit --locked
+        run: cargo audit
 
   build:
     name: Build ${{ matrix.target }}

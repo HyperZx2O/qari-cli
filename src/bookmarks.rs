@@ -65,7 +65,12 @@ mod tests {
     use super::*;
 
     fn temp_path(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("qari-test-{}-{name}.json", std::process::id()))
+        let base = std::env::temp_dir();
+        #[cfg(target_os = "macos")]
+        let base = base
+            .canonicalize()
+            .expect("temporary directory should be canonicalizable");
+        base.join(format!("qari-test-{}-{name}.json", std::process::id()))
     }
 
     #[test]
