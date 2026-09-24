@@ -1,10 +1,10 @@
 {
   "name": "qari-cli",
   "version": "0.1.0",
-  "description": "Read the Quran in your terminal",
+  "description": "Quran CLI and TUI for reading, searching, and browsing Quran, Hadith, and scriptures in your terminal.",
   "bin": { "qari": "./install.js" },
-  "scripts": { "postinstall": "node install.js" },
-  "files": ["install.js", "package.json", "README.md", "LICENSE"],
+  "scripts": { "postinstall": "node install.js", "test": "node --test install.test.js" },
+  "files": ["install.js", "checksums.json", "package.json", "README.md", "LICENSE"],
   "preferGlobal": true,
   "engines": { "node": ">=18" },
   "repository": {
@@ -13,6 +13,25 @@
   },
   "homepage": "https://github.com/HyperZx2O/qari-cli#readme",
   "bugs": { "url": "https://github.com/HyperZx2O/qari-cli/issues" },
-  "keywords": ["quran", "islam", "cli", "terminal", "tui"],
+  "keywords": [
+    "quran",
+    "quran-cli",
+    "quran-reader",
+    "islam",
+    "islamic",
+    "hadith",
+    "hadith-cli",
+    "arabic",
+    "bible",
+    "scripture",
+    "prayer-times",
+    "cli",
+    "terminal",
+    "tui",
+    "offline",
+    "search",
+    "bookmark",
+    "rust"
+  ],
   "license": "MIT"
 }

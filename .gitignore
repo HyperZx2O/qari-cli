@@ -4,7 +4,6 @@ npm/bin/
 npm/README.md
 npm/LICENSE
 npm/node_modules/
-npm/package-lock.json
 .ruff_cache/
 __pycache__/
 *.py[cod]

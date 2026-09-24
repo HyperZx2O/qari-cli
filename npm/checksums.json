@@ -1,0 +1,8 @@
+{
+  "qari-aarch64-apple-darwin.tar.gz": "fceb42ca86f17e6f878cb6e853ac5a5d38d386538e4024dfead684b8c6fbba58",
+  "qari-aarch64-pc-windows-msvc.zip": "b794cc7aaf3453cff1b6fdc847e8d5409ead770a06cf33043f3764f86737edc0",
+  "qari-aarch64-unknown-linux-gnu.tar.gz": "7ef353db0327423d49dbe535a61c3815f5d64d4d7545a0c457beb40355f686ca",
+  "qari-x86_64-apple-darwin.tar.gz": "51734fabb1c68f7fa0d9199cdf8eaa7c702a2c2ab7f805a9bcb3b84bd68c1af4",
+  "qari-x86_64-pc-windows-msvc.zip": "5e9a25a3fd75b9d2282309e44116580715058f65f9123cd12c09dd68ded2fb4b",
+  "qari-x86_64-unknown-linux-gnu.tar.gz": "966b766abb0828d8889cb0a1d997185fd6a8b06ab26c7fa78676bf8e42bb9966"
+}

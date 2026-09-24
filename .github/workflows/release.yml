@@ -5,13 +5,31 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Audit Rust dependencies
+        run: cargo audit --locked
+
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -29,17 +47,19 @@ jobs:
           - os: windows-11-arm
             target: aarch64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Sync Cargo version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: sed -i.bak 's/^version = ".*"/version = "'"${GITHUB_REF_NAME#v}"'"/' Cargo.toml && rm -f Cargo.toml.bak
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           targets: ${{ matrix.target }}
       - name: Install Linux ARM builder
         if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cargo install cross --locked
+        run: cargo install cross --version 0.2.5 --locked
       - name: Test
         if: matrix.target != 'aarch64-unknown-linux-gnu'
         run: cargo test --locked
@@ -56,22 +76,25 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: Compress-Archive target/${{ matrix.target }}/release/qari.exe qari-${{ matrix.target }}.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: qari-${{ matrix.target }}
           path: qari-${{ matrix.target }}.*
 
   release:
-    needs: build
+    needs: [build, audit]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
           merge-multiple: true
       - name: Generate checksums
         run: cd artifacts && sha256sum qari-* > SHA256SUMS.txt
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
           files: |
@@ -80,14 +103,36 @@ jobs:
             artifacts/SHA256SUMS.txt
 
   publish-npm:
-    needs: release
+    needs: [release, audit]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Refresh packaged checksums
+        working-directory: npm
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const lines = fs.readFileSync('../artifacts/SHA256SUMS.txt', 'utf8').trim().split(/\r?\n/);
+          const checksums = Object.fromEntries(lines.map((line) => {
+            const match = line.match(/^([a-f0-9]{64})\s+\*?(.+)$/);
+            if (!match) throw new Error(`Invalid checksum line: ${line}`);
+            return [match[2], match[1]];
+          }));
+          fs.writeFileSync('checksums.json', `${JSON.stringify(checksums, null, 2)}\n`);
+          NODE
       - name: Set package version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: npm
@@ -100,11 +145,13 @@ jobs:
       - name: Check package contents
         working-directory: npm
         run: npm pack --dry-run
-      - name: Smoke-test installer (node + bun)
+      - name: Test installer
         working-directory: npm
         run: |
           node --check install.js
           node -e "require('./package.json')"
+          npm test
+          npm audit --audit-level=high
       - name: Publish
         working-directory: npm
         run: npm publish
