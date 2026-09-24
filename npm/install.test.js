@@ -9,7 +9,7 @@ test("expectedChecksum only returns the packaged archive hash", () => {
 });
 
 test("release URL is immutable and versioned", () => {
-  assert.equal(releaseBaseUrl(), "https://github.com/HyperZx2O/qari-cli/releases/download/v0.1.0");
+  assert.equal(releaseBaseUrl(), "https://github.com/HyperZx2O/qari-cli/releases/download/v0.1.1");
 });
 
 test("download URLs must use HTTPS and an allowed host", () => {
