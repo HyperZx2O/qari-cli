@@ -124,12 +124,16 @@ jobs:
         working-directory: npm
         run: |
           node - <<'NODE'
+          const crypto = require('crypto');
           const fs = require('fs');
-          const lines = fs.readFileSync('../artifacts/SHA256SUMS.txt', 'utf8').trim().split(/\r?\n/);
-          const checksums = Object.fromEntries(lines.map((line) => {
-            const match = line.match(/^([a-f0-9]{64})\s+\*?(.+)$/);
-            if (!match) throw new Error(`Invalid checksum line: ${line}`);
-            return [match[2], match[1]];
+          const path = require('path');
+          const artifactDir = path.resolve('../artifacts');
+          const files = fs.readdirSync(artifactDir).filter((name) => name.startsWith('qari-'));
+          if (files.length !== 6) throw new Error(`Expected 6 release archives, found ${files.length}`);
+          const checksums = Object.fromEntries(files.map((name) => {
+            const hash = crypto.createHash('sha256');
+            hash.update(fs.readFileSync(path.join(artifactDir, name)));
+            return [name, hash.digest('hex')];
           }));
           fs.writeFileSync('checksums.json', `${JSON.stringify(checksums, null, 2)}\n`);
           NODE

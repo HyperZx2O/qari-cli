@@ -1,6 +1,6 @@
 {
   "name": "qari-cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Quran CLI and TUI for reading, searching, and browsing Quran, Hadith, and scriptures in your terminal.",
   "bin": { "qari": "./install.js" },
   "scripts": { "postinstall": "node install.js", "test": "node --test install.test.js" },

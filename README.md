@@ -31,7 +31,7 @@ Or on Linux/macOS, download and review a versioned installer first:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fL -o install.sh \
-  https://raw.githubusercontent.com/HyperZx2O/qari-cli/v0.1.2/install.sh
+  https://raw.githubusercontent.com/HyperZx2O/qari-cli/v0.1.3/install.sh
 less install.sh
 bash install.sh
 ```
