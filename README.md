@@ -1,6 +1,14 @@
-# qari-cli
+# qari-cli — Quran CLI and Terminal Scripture Reader
 
-A terminal scripture library: fourteen shelves — six revelations plus eight hadith books — in one static Rust binary. A three-column TUI for reading, and a pipe-friendly CLI for everything else.
+[![CI](https://github.com/HyperZx2O/qari-cli/actions/workflows/release.yml/badge.svg)](https://github.com/HyperZx2O/qari-cli/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/HyperZx2O/qari-cli?label=release)](https://github.com/HyperZx2O/qari-cli/releases/latest)
+[![npm](https://img.shields.io/npm/v/qari-cli?label=npm)](https://www.npmjs.com/package/qari-cli)
+[![License](https://img.shields.io/github/license/HyperZx2O/qari-cli)](https://github.com/HyperZx2O/qari-cli/blob/main/LICENSE)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2f6f5f)](https://github.com/HyperZx2O/qari-cli/releases/latest)
+
+A Quran CLI and terminal scripture reader: fourteen shelves — six revelations plus eight hadith books — in one static Rust binary. A three-column TUI for reading, and a pipe-friendly CLI for everything else.
+
+Read, search, and browse the Quran, Hadith, and other scriptures in your terminal with English translations where available, offline caching, prayer times, bookmarks, and keyboard navigation.
 
 No commentary, no audio, no web or mobile UI. Primary texts with English where a translation exists, and an honest marker where one does not.
 
@@ -19,11 +27,17 @@ bun add -g qari-cli
 bunx qari-cli today
 ```
 
-Or on Linux/macOS:
+Or on Linux/macOS, download and review a versioned installer first:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/HyperZx2O/qari-cli/main/install.sh | bash
+curl --proto '=https' --tlsv1.2 -fL -o install.sh \
+  https://raw.githubusercontent.com/HyperZx2O/qari-cli/v0.1.0/install.sh
+less install.sh
+bash install.sh
 ```
+
+The installer verifies the release checksum before extracting the binary and installs to
+`~/.local/bin` by default. Set `INSTALL_DIR` to choose another user-writable directory.
 
 Prebuilt binaries for Windows, macOS, and Linux (including Windows ARM64) are attached to every GitHub release.
 
