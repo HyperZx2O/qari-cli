@@ -1,4 +1,5 @@
 use crate::collection::{self, CollectionId};
+use crate::output::sanitize_terminal_text;
 use crate::quran::{Ayah, Surah};
 use crossterm::style::Stylize;
 use std::io::{self, IsTerminal};
@@ -156,9 +157,13 @@ pub(crate) fn print_chapter(
         )
     );
     for (id, arabic, english) in &verses {
-        println!("{id} {arabic}");
+        println!(
+            "{} {}",
+            sanitize_terminal_text(id),
+            sanitize_terminal_text(arabic)
+        );
         if let Some(english) = english {
-            println!("  {english}");
+            println!("  {}", sanitize_terminal_text(english));
         }
         if is_tty {
             println!();
@@ -256,15 +261,24 @@ pub(crate) fn print_ayah(surah: &Surah, ayah: &Ayah, is_tty: bool) {
     );
 
     println!("{}", emphasize(&location, is_tty));
-    println!("{}  {}", emphasize("Arabic:", is_tty), ayah.arabic);
-    println!("{} {}", emphasize("English:", is_tty), ayah.english);
+    println!(
+        "{}  {}",
+        emphasize("Arabic:", is_tty),
+        sanitize_terminal_text(&ayah.arabic)
+    );
+    println!(
+        "{} {}",
+        emphasize("English:", is_tty),
+        sanitize_terminal_text(&ayah.english)
+    );
 }
 
 fn emphasize(text: &str, is_tty: bool) -> String {
+    let text = sanitize_terminal_text(text);
     if is_tty {
         text.bold().yellow().to_string()
     } else {
-        text.to_string()
+        text
     }
 }
 

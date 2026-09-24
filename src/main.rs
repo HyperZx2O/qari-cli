@@ -8,6 +8,7 @@ mod data;
 mod hadith;
 mod input;
 mod intro;
+mod output;
 mod prayer;
 mod quran;
 mod rtl;
@@ -92,7 +93,10 @@ fn main() {
     let cli = Cli::parse();
 
     if let Err(error) = data::ensure_data_dir() {
-        eprintln!("Cannot create qari-cli data directories: {error}");
+        eprintln!(
+            "Cannot create qari-cli data directories: {}",
+            output::sanitize_terminal_text(&error.to_string())
+        );
         std::process::exit(1);
     }
 
@@ -102,13 +106,13 @@ fn main() {
     match cli.command {
         Some(Commands::Pray { city, country }) => {
             if let Err(error) = commands::pray::run(&config, city.as_deref(), country.as_deref()) {
-                eprintln!("{error}");
+                eprintln!("{}", output::sanitize_terminal_text(&error));
                 std::process::exit(2);
             }
         }
         Some(Commands::Hadith { collection, number }) => {
             if let Err(error) = commands::hadith::run(collection.as_deref(), number) {
-                eprintln!("{error}");
+                eprintln!("{}", output::sanitize_terminal_text(&error));
                 std::process::exit(2);
             }
         }
@@ -124,14 +128,17 @@ fn main() {
                 book.as_deref(),
                 chapter,
             ) {
-                eprintln!("{error}");
+                eprintln!("{}", output::sanitize_terminal_text(&error));
                 std::process::exit(2);
             }
         }
         Some(Commands::Intro) => run_tui(config, true),
         Some(command) => {
             let surahs = data::load_quran().unwrap_or_else(|error| {
-                eprintln!("Could not load the complete Quran: {error}");
+                eprintln!(
+                    "Could not load the complete Quran: {}",
+                    output::sanitize_terminal_text(&error.to_string())
+                );
                 eprintln!("Using the bundled offline selection.");
                 data::load_fallback()
             });
@@ -152,7 +159,7 @@ fn main() {
                 | Commands::Intro => unreachable!(),
             };
             if let Err(error) = result {
-                eprintln!("{error}");
+                eprintln!("{}", output::sanitize_terminal_text(&error));
                 std::process::exit(2);
             }
         }
@@ -162,7 +169,10 @@ fn main() {
 
 fn run_tui(config: config::Config, show_intro: bool) {
     if let Err(error) = app::run(config, show_intro) {
-        eprintln!("TUI error: {error}");
+        eprintln!(
+            "TUI error: {}",
+            output::sanitize_terminal_text(&error.to_string())
+        );
         std::process::exit(1);
     }
 }

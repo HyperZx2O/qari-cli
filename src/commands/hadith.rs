@@ -1,4 +1,5 @@
 use crate::hadith;
+use crate::output::sanitize_terminal_text;
 use chrono::{Datelike, Local};
 
 /// `qari hadith` alone prints the Bukhari hadith of the day; naming a book
@@ -19,8 +20,12 @@ fn run_today() -> Result<(), String> {
     let entry = entries
         .get(ordinal.saturating_sub(1) % entries.len().max(1))
         .ok_or_else(|| format!("{} has no hadiths to show", book.label))?;
-    println!("Hadith of the Day — {} #{}\n", book.label, entry.number);
-    println!("{}", entry.english);
+    println!(
+        "Hadith of the Day — {} #{}\n",
+        sanitize_terminal_text(book.label),
+        entry.number
+    );
+    println!("{}", sanitize_terminal_text(&entry.english));
     Ok(())
 }
 
@@ -35,14 +40,14 @@ fn run_book(collection: &str, number: Option<u32>) -> Result<(), String> {
             .iter()
             .find(|entry| entry.number == number)
             .ok_or_else(|| format!("{} {number} is not available", book.label))?;
-        println!("{} {}\n", book.label, entry.number);
+        println!("{} {}\n", sanitize_terminal_text(book.label), entry.number);
         println!(
             "{}{}",
-            entry.arabic,
+            sanitize_terminal_text(&entry.arabic),
             if entry.english.is_empty() {
                 String::new()
             } else {
-                format!("\n\n{}", entry.english)
+                format!("\n\n{}", sanitize_terminal_text(&entry.english))
             }
         );
         return Ok(());
@@ -50,7 +55,7 @@ fn run_book(collection: &str, number: Option<u32>) -> Result<(), String> {
     println!("{} ({} hadith):\n", book.label, entries.len());
     for entry in &entries {
         let preview: String = entry.english.chars().take(72).collect();
-        println!("{:>4}. {preview}", entry.number);
+        println!("{:>4}. {}", entry.number, sanitize_terminal_text(&preview));
     }
     Ok(())
 }

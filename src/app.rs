@@ -162,9 +162,9 @@ impl AppState {
                 })
                 .is_some_and(|key| bookmarks.contains(&key))
         });
-        let status_msg = bookmark_error
-            .as_deref()
-            .map(|reason| format!("Bookmarks unavailable ({reason})"));
+        let status_msg = bookmark_error.as_deref().map(|reason| {
+            crate::output::sanitize_terminal_text(&format!("Bookmarks unavailable ({reason})"))
+        });
         let status_started = status_msg.as_ref().map(|_| Instant::now());
 
         let collection = CollectionId::from_key(&config.collection);
@@ -1105,10 +1105,10 @@ impl AppState {
                 Language::English => format!("\n{}", ayah.english),
             };
             return Some((
-                format!(
+                crate::output::sanitize_terminal_text(&format!(
                     "{} {}:{}\n{}{}",
                     surah.name_transliterated, surah.number, ayah.number, ayah.arabic, translation
-                ),
+                )),
                 format!("{}:{}", surah.number, ayah.number),
             ));
         }
@@ -1126,7 +1126,10 @@ impl AppState {
                 text.push_str(&format!("\n{english}"));
             }
         }
-        Some((text, self.current_bookmark_key().unwrap_or_default()))
+        Some((
+            crate::output::sanitize_terminal_text(&text),
+            self.current_bookmark_key().unwrap_or_default(),
+        ))
     }
 
     fn toggle_bookmark(&mut self) {
@@ -1213,13 +1216,13 @@ impl AppState {
     }
 
     fn set_status(&mut self, message: impl Into<String>) {
-        self.status_msg = Some(message.into());
+        self.status_msg = Some(crate::output::sanitize_terminal_text(&message.into()));
         self.status_error = false;
         self.status_started = Some(Instant::now());
     }
 
     fn set_error(&mut self, message: impl Into<String>) {
-        self.status_msg = Some(message.into());
+        self.status_msg = Some(crate::output::sanitize_terminal_text(&message.into()));
         self.status_error = true;
         self.status_started = Some(Instant::now());
     }

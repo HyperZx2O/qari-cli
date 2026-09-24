@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::output::sanitize_terminal_text;
 use crate::prayer::{calculate_prayer_times, hijri_date, hijri_month_name};
 use chrono::Local;
 use serde::Deserialize;
@@ -47,15 +48,15 @@ pub fn run(config: &Config, city: Option<&str>, country: Option<&str>) -> Result
             Ok(response) => {
                 println!(
                     "Prayer Times for {}, {} — {}",
-                    city,
-                    country.unwrap_or("BD"),
+                    sanitize_terminal_text(city),
+                    sanitize_terminal_text(country.unwrap_or("BD")),
                     now.format("%A %d %b %Y")
                 );
                 println!(
                     "Hijri: {} {} {}\n",
-                    response.data.date.hijri.day,
-                    response.data.date.hijri.month.en,
-                    response.data.date.hijri.year
+                    sanitize_terminal_text(&response.data.date.hijri.day),
+                    sanitize_terminal_text(&response.data.date.hijri.month.en),
+                    sanitize_terminal_text(&response.data.date.hijri.year)
                 );
                 let t = response.data.timings;
                 print_rows(api_rows(&t));
@@ -99,11 +100,14 @@ fn fetch_city(city: &str, country: &str) -> Result<ApiResponse, String> {
 /// AlAdhan serves times like `05:12 (BST)`: keep the clock part.
 fn api_rows(timings: &ApiTimings) -> [(&'static str, String); 5] {
     [
-        ("Fajr", clean_time(&timings.fajr).to_string()),
-        ("Dhuhr", clean_time(&timings.dhuhr).to_string()),
-        ("Asr", clean_time(&timings.asr).to_string()),
-        ("Maghrib", clean_time(&timings.maghrib).to_string()),
-        ("Isha", clean_time(&timings.isha).to_string()),
+        ("Fajr", sanitize_terminal_text(clean_time(&timings.fajr))),
+        ("Dhuhr", sanitize_terminal_text(clean_time(&timings.dhuhr))),
+        ("Asr", sanitize_terminal_text(clean_time(&timings.asr))),
+        (
+            "Maghrib",
+            sanitize_terminal_text(clean_time(&timings.maghrib)),
+        ),
+        ("Isha", sanitize_terminal_text(clean_time(&timings.isha))),
     ]
 }
 

@@ -82,7 +82,10 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, colors: &Theme
                 .fg(colors.accent)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(location, Style::default().fg(colors.foreground)),
+        Span::styled(
+            crate::output::sanitize_terminal_text(&location),
+            Style::default().fg(colors.foreground),
+        ),
     ];
     if state.offline_mode {
         spans.push(Span::styled(
@@ -245,45 +248,46 @@ fn render_books(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &Th
 fn render_units(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &ThemeColors) {
     frame.render_widget(Clear, area);
     let active = state.active_panel == Panel::Ayahs && !state.search_mode;
-    let (items, use_unit_list): (Vec<ListItem>, bool) =
-        if state.juz_mode && state.collection == CollectionId::Quran {
-            (
-                crate::quran::juz_entries(&state.surahs, state.current_juz)
-                    .into_iter()
-                    .map(|(surah_index, ayah_index)| {
-                        let surah = &state.surahs[surah_index];
-                        let ayah = &surah.ayahs[ayah_index];
-                        ListItem::new(format!("{}:{}", surah.number, ayah.number))
+    let (items, use_unit_list): (Vec<ListItem>, bool) = if state.juz_mode
+        && state.collection == CollectionId::Quran
+    {
+        (
+            crate::quran::juz_entries(&state.surahs, state.current_juz)
+                .into_iter()
+                .map(|(surah_index, ayah_index)| {
+                    let surah = &state.surahs[surah_index];
+                    let ayah = &surah.ayahs[ayah_index];
+                    ListItem::new(format!("{}:{}", surah.number, ayah.number))
+                })
+                .collect(),
+            false,
+        )
+    } else {
+        match state.collection {
+            CollectionId::Quran => (
+                state
+                    .surahs
+                    .iter()
+                    .map(|surah| {
+                        let badge = if surah.is_meccan { "M" } else { "D" };
+                        ListItem::new(crate::output::sanitize_terminal_text(&format!(
+                            "{:>3}. {} [{}]",
+                            surah.number, surah.name_transliterated, badge
+                        )))
                     })
                     .collect(),
                 false,
-            )
-        } else {
-            match state.collection {
-                CollectionId::Quran => (
-                    state
-                        .surahs
-                        .iter()
-                        .map(|surah| {
-                            let badge = if surah.is_meccan { "M" } else { "D" };
-                            ListItem::new(format!(
-                                "{:>3}. {} [{}]",
-                                surah.number, surah.name_transliterated, badge
-                            ))
-                        })
-                        .collect(),
-                    false,
-                ),
-                _ => (
-                    state
-                        .units
-                        .iter()
-                        .map(|unit| ListItem::new(unit.label.clone()))
-                        .collect(),
-                    true,
-                ),
-            }
-        };
+            ),
+            _ => (
+                state
+                    .units
+                    .iter()
+                    .map(|unit| ListItem::new(crate::output::sanitize_terminal_text(&unit.label)))
+                    .collect(),
+                true,
+            ),
+        }
+    };
     let highlight_style = if active {
         Style::default()
             .bg(colors.highlight)
@@ -312,7 +316,8 @@ fn render_units(frame: &mut Frame, area: Rect, state: &mut AppState, colors: &Th
 
 /// Wrapped rows for one text, with a blank fallback for empty input.
 fn wrap_or_blank(text: &str, content_width: usize) -> Vec<String> {
-    let mut wrapped = crate::wrap::wrap_text(text, content_width);
+    let mut wrapped =
+        crate::wrap::wrap_text(&crate::output::sanitize_terminal_text(text), content_width);
     if wrapped.is_empty() {
         wrapped.push(String::new());
     }
@@ -471,7 +476,10 @@ fn render_reader_panel(
             .chapter_error
             .clone()
             .unwrap_or_else(|| "Select a unit to read".to_string());
-        lines.push(Line::styled(message, muted));
+        lines.push(Line::styled(
+            crate::output::sanitize_terminal_text(&message),
+            muted,
+        ));
         render_scroll_lines(frame, area, block, inner, lines, state, colors);
         return;
     };
@@ -488,7 +496,11 @@ fn render_reader_panel(
         let cursor = verse_index == state.current_ayah && active;
         let (label, style) = cursor_line(format!("Verse {verse_id}"), cursor, muted, highlight);
         push_wrapped(&mut lines, &label, style, content_width);
-        for row in crate::rtl::terminal_lines(arabic, content_width, state.rtl_mode) {
+        for row in crate::rtl::terminal_lines(
+            &crate::output::sanitize_terminal_text(arabic),
+            content_width,
+            state.rtl_mode,
+        ) {
             lines.push(Line::styled(row, sacred).alignment(Alignment::Right));
         }
         if state.language == Language::English {
@@ -637,7 +649,7 @@ fn render_search_overlay(
         .iter()
         .map(|result| {
             ListItem::new(crate::wrap::truncate_clusters(
-                &result.display,
+                &crate::output::sanitize_terminal_text(&result.display),
                 result_width,
             ))
         })
@@ -813,7 +825,7 @@ fn verse_modal_lines(
         }
         None => lines.push(Line::styled("(AR)", muted)),
     }
-    Some((title, lines))
+    Some((crate::output::sanitize_terminal_text(&title), lines))
 }
 
 fn panel_block(title: &'static str, active: bool, colors: &ThemeColors) -> Block<'static> {

@@ -41,6 +41,15 @@ impl Default for Config {
 
 pub fn load_config() -> Config {
     let path = get_config_dir().join("config.toml");
+    if crate::data::reject_symlink_components(&path).is_err() {
+        return Config::default();
+    }
+    match path.metadata() {
+        Ok(metadata) if metadata.len() > 64 * 1024 => return Config::default(),
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Config::default(),
+    }
     std::fs::read_to_string(path)
         .ok()
         .and_then(|content| toml::from_str(&content).ok())
@@ -53,7 +62,7 @@ pub fn save_config(config: &Config) {
         return;
     }
     if let Ok(content) = toml::to_string_pretty(config) {
-        let _ = std::fs::write(dir.join("config.toml"), content);
+        let _ = crate::data::write_atomic(&dir.join("config.toml"), &content);
     }
 }
 

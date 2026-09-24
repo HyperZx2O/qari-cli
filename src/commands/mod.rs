@@ -32,6 +32,9 @@ pub fn chapter_at_ordinal(
 ) -> Result<(String, u32, Option<String>), String> {
     let books = collection::book_chapter_counts(collection)?;
     let total: usize = books.iter().map(|(_, count)| *count as usize).sum();
+    if total > 200_000 {
+        return Err("Collection exceeds the supported unit limit".to_string());
+    }
     if total == 0 {
         return Err("No chapters are available".to_string());
     }

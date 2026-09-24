@@ -1,4 +1,5 @@
 use crate::collection::{self, CollectionId};
+use crate::output::sanitize_terminal_text;
 use crate::quran::Surah;
 use crate::search::search_quran;
 use crate::search::{search_collection, CollectionChapter};
@@ -35,12 +36,16 @@ pub fn run(query: &str, surahs: &[Surah], collection: Option<&str>) -> Result<()
     let results = search_collection(collection.key(), collection.label(), &chapters, query, true);
     println!(
         "Results for \"{}\" in {} ({} found):\n",
-        query.trim(),
+        sanitize_terminal_text(query.trim()),
         collection.label(),
         results.len()
     );
     for (index, result) in results.iter().enumerate() {
-        println!("{:>2}. {}", index + 1, result.display);
+        println!(
+            "{:>2}. {}",
+            index + 1,
+            sanitize_terminal_text(&result.display)
+        );
     }
     Ok(())
 }
@@ -49,7 +54,7 @@ fn run_quran(query: &str, surahs: &[Surah]) -> Result<(), String> {
     let results = search_quran(query, surahs);
     println!(
         "Results for \"{}\" ({} found):\n",
-        query.trim(),
+        sanitize_terminal_text(query.trim()),
         results.len()
     );
 
@@ -59,8 +64,8 @@ fn run_quran(query: &str, surahs: &[Surah]) -> Result<(), String> {
             index + 1,
             result.surah_number,
             result.ayah_number,
-            result.surah_name,
-            crate::wrap::truncate_clusters(&result.english_text, 100)
+            sanitize_terminal_text(&result.surah_name),
+            sanitize_terminal_text(&crate::wrap::truncate_clusters(&result.english_text, 100))
         );
     }
     Ok(())

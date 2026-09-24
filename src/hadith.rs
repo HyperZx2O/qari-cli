@@ -118,6 +118,8 @@ fn load_bulk(
     url: &str,
 ) -> Result<Vec<(String, String)>, String> {
     let path = cache_path(book.id, language);
+    crate::data::reject_symlink_components(&path)
+        .map_err(|error| format!("refusing unsafe hadith cache path: {error}"))?;
     let text = match std::fs::read_to_string(&path) {
         Ok(cached) => cached,
         Err(_) => {
@@ -159,6 +161,11 @@ pub(crate) fn is_empty_row(arabic: &str, english: &str) -> bool {
 fn parse_bulk(text: &str) -> Result<Vec<(String, String)>, String> {
     let edition: BulkEdition =
         serde_json::from_str(text).map_err(|error| format!("invalid hadith payload: {error}"))?;
+    if edition.hadiths.len() > MAX_HADITHS_PER_BOOK {
+        return Err(format!(
+            "hadith payload exceeds {MAX_HADITHS_PER_BOOK} entries"
+        ));
+    }
     Ok(edition
         .hadiths
         .into_iter()
@@ -196,6 +203,8 @@ fn join_entries(arabic: Vec<(String, String)>, english: Vec<(String, String)>) -
 
 /// One whole hadith book, shared without cloning: the TUI shelf fans it
 /// out into chapters, the CLI reads the same store.
+const MAX_HADITHS_PER_BOOK: usize = 100_000;
+
 pub type HadithBulk = Rc<Vec<HadithEntry>>;
 
 /// One book's hadiths with Arabic joined to English by number. Keeps a
@@ -230,7 +239,11 @@ pub fn load_cached_entries(book_id: &str) -> Vec<HadithEntry> {
         return Vec::new();
     };
     let read = |language: &str| -> Vec<(String, String)> {
-        std::fs::read_to_string(cache_path(book.id, language))
+        let path = cache_path(book.id, language);
+        if crate::data::reject_symlink_components(&path).is_err() {
+            return Vec::new();
+        }
+        std::fs::read_to_string(path)
             .ok()
             .and_then(|text| parse_bulk(&text).ok())
             .unwrap_or_default()

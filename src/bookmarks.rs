@@ -26,6 +26,16 @@ pub fn load() -> Result<Vec<String>, String> {
 }
 
 pub fn load_from(path: &Path) -> Result<Vec<String>, String> {
+    crate::data::reject_symlink_components(path)
+        .map_err(|error| format!("refusing unsafe bookmark path: {error}"))?;
+    match path.metadata() {
+        Ok(metadata) if metadata.len() > 1024 * 1024 => {
+            return Err("bookmarks file exceeds the 1 MiB limit".to_string())
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
+    }
     let contents = match std::fs::read_to_string(path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(error.to_string()),
@@ -43,7 +53,7 @@ pub fn save_to(path: &Path, bookmarks: &[String]) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
     let contents = serde_json::to_string_pretty(bookmarks).map_err(|error| error.to_string())?;
-    std::fs::write(path, contents).map_err(|error| error.to_string())
+    crate::data::write_atomic(path, &contents).map_err(|error| error.to_string())
 }
 
 pub fn is_bookmarked(key: &str) -> bool {

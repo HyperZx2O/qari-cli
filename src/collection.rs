@@ -332,6 +332,9 @@ pub fn book_display(collection: CollectionId, book_id: &str) -> String {
     }
 }
 
+const MAX_COLLECTION_UNITS: usize = 200_000;
+const MAX_CACHED_CHAPTERS: usize = 10_000;
+
 /// One directly-readable unit for column 2: a surah-equivalent flattened
 /// with its book prefix, so every shelf is one level deep. Quran units
 /// come from the loaded surahs instead and never live here.
@@ -347,6 +350,10 @@ pub struct FlatUnit {
 /// the cached books index (or the Hadith bulk store); no network.
 pub fn flat_units(collection: CollectionId, books: &[crate::alkotob::BookMeta]) -> Vec<FlatUnit> {
     if collection == CollectionId::Quran {
+        return Vec::new();
+    }
+    let total_units: usize = books.iter().map(|book| book.chapter_count as usize).sum();
+    if total_units > MAX_COLLECTION_UNITS {
         return Vec::new();
     }
     // Zabur and every hadith book ship one book whose chapters are the
@@ -466,6 +473,11 @@ pub fn load_cached_corpus(collection: CollectionId) -> Result<Vec<CachedChapter>
             .collect();
         numbers.sort_unstable();
         for chapter in numbers {
+            if corpus.len() >= MAX_CACHED_CHAPTERS {
+                return Err(format!(
+                    "cached corpus exceeds {MAX_CACHED_CHAPTERS} chapters"
+                ));
+            }
             let Ok(arabic) = crate::alkotob::load_chapter(edition, &book.id, chapter) else {
                 continue;
             };

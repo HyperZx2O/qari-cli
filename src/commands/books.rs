@@ -1,5 +1,6 @@
 use crate::alkotob;
 use crate::collection::CollectionId;
+use crate::output::sanitize_terminal_text;
 
 /// List Alkotob editions and their books (Tawrat, Zabur, Injil, …),
 /// or print one chapter's verses.
@@ -14,14 +15,18 @@ pub fn run(
         let data = crate::alkotob::load_chapter(edition, book, chapter)?;
         println!(
             "{} — {} {}:{} ({} verses)",
-            data.name,
-            data.edition,
-            data.book,
+            sanitize_terminal_text(&data.name),
+            sanitize_terminal_text(&data.edition),
+            sanitize_terminal_text(&data.book),
             data.number,
             data.verses.len()
         );
         for verse in &data.verses {
-            println!("{} {}", verse.id, verse.content);
+            println!(
+                "{} {}",
+                sanitize_terminal_text(&verse.id),
+                sanitize_terminal_text(&verse.content)
+            );
         }
         return Ok(());
     }
@@ -45,7 +50,11 @@ pub fn run(
     for edition in &editions {
         println!(
             "{} [{}] — {} ({} {})",
-            edition.revelation, edition.id, edition.name, edition.language, edition.direction
+            sanitize_terminal_text(&edition.revelation),
+            sanitize_terminal_text(&edition.id),
+            sanitize_terminal_text(&edition.name),
+            sanitize_terminal_text(&edition.language),
+            sanitize_terminal_text(&edition.direction)
         );
         match alkotob::load_books(&edition.id) {
             Ok(books) => {
@@ -65,11 +74,16 @@ pub fn run(
                     };
                     println!(
                         "  {:>4}  {} ({} chapters)",
-                        book.id, name, book.chapter_count
+                        sanitize_terminal_text(&book.id),
+                        sanitize_terminal_text(&name),
+                        book.chapter_count
                     );
                 }
             }
-            Err(error) => eprintln!("  Could not list books for {}: {error}", edition.id),
+            Err(error) => eprintln!(
+                "  Could not list books for {}: {error}",
+                sanitize_terminal_text(&edition.id)
+            ),
         }
     }
     Ok(())
